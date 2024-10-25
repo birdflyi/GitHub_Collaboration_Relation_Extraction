@@ -1,0 +1,70 @@
+[2024-10-26 04:57:43 - ERROR - main.py:line 111]: Traceback (most recent call last):
+  File "C:\Users\10651\AppData\Roaming\Python\Python39\site-packages\pandas\core\indexes\base.py", line 3802, in get_loc
+    return self._engine.get_loc(casted_key)
+  File "pandas\_libs\index.pyx", line 138, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas\_libs\index.pyx", line 165, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas\_libs\hashtable_class_helper.pxi", line 5745, in pandas._libs.hashtable.PyObjectHashTable.get_item
+  File "pandas\_libs\hashtable_class_helper.pxi", line 5753, in pandas._libs.hashtable.PyObjectHashTable.get_item
+KeyError: 'body'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\10651\AppData\Roaming\Python\Python39\site-packages\pandas\core\frame.py", line 4141, in _set_item_mgr
+    loc = self._info_axis.get_loc(key)
+  File "C:\Users\10651\AppData\Roaming\Python\Python39\site-packages\pandas\core\indexes\base.py", line 3804, in get_loc
+    raise KeyError(key) from err
+KeyError: 'body'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\github_repo\GitHub_Collaboration_Relation_Extraction\main.py", line 101, in <module>
+    obj_collaboration_tuple_list = get_obj_collaboration_tuples_from_record(rec)
+  File "D:\github_repo\GitHub_Collaboration_Relation_Extraction\script\model\Relation_extraction.py", line 128, in get_obj_collaboration_tuples_from_record
+    df_bodyRegLinks_eachLinkPatType = get_df_bodyRegLinks_eachLinkPatType(df_record)
+  File "D:\github_repo\GitHub_Collaboration_Relation_Extraction\script\model\Entity_recognition.py", line 27, in get_df_bodyRegLinks_eachLinkPatType
+    df_local_msg_regexed_dict = get_df_local_msg_regexed_dict(df_local_msg, use_msg_columns=use_msg_columns)
+  File "D:\github_repo\GitHub_Collaboration_Relation_Extraction\script\identify_reference.py", line 260, in get_df_local_msg_regexed_dict
+    df_local_msg_regexed = df_regexed_union_by_patterns(df_local_msg, use_msg_columns, regex_patterns, use_data_conf=USE_REG_SUB_STRS, union_on_col=record_key)
+  File "D:\github_repo\GitHub_Collaboration_Relation_Extraction\script\identify_reference.py", line 199, in df_regexed_union_by_patterns
+    temp_df = regex_df(df, use_msg_columns, regex_pattern, use_data_conf=use_data_conf)
+  File "D:\github_repo\GitHub_Collaboration_Relation_Extraction\script\identify_reference.py", line 128, in regex_df
+    df_regexed[column] = pd.Series(np.where(regexed_len_series.values > 0, temp_series.values, np.nan), index=temp_series.index) # 将匹配到子串的结果长度为0时设置为np.nan是为下一步过滤做准备，特别是出现'[]'时应被替换为np.nan，以被update更新
+  File "C:\Users\10651\AppData\Roaming\Python\Python39\site-packages\pandas\core\frame.py", line 3980, in __setitem__
+    self._set_item(key, value)
+  File "C:\Users\10651\AppData\Roaming\Python\Python39\site-packages\pandas\core\frame.py", line 4187, in _set_item
+    self._set_item_mgr(key, value)
+  File "C:\Users\10651\AppData\Roaming\Python\Python39\site-packages\pandas\core\frame.py", line 4144, in _set_item_mgr
+    self._mgr.insert(len(self._info_axis), key, value)
+  File "C:\Users\10651\AppData\Roaming\Python\Python39\site-packages\pandas\core\internals\managers.py", line 1405, in insert
+    new_axis = self.items.insert(loc, item)
+  File "C:\Users\10651\AppData\Roaming\Python\Python39\site-packages\pandas\core\indexes\base.py", line 6899, in insert
+    return Index._with_infer(new_values, name=self.name)
+  File "C:\Users\10651\AppData\Roaming\Python\Python39\site-packages\pandas\core\indexes\base.py", line 714, in _with_infer
+    with warnings.catch_warnings():
+  File "D:\ProgramData\Anaconda3\lib\warnings.py", line 458, in __enter__
+    def __enter__(self):
+KeyboardInterrupt
+
+[2024-10-26 05:11:56 - ERROR - main.py:line 112]: Traceback (most recent call last):
+  File "D:\github_repo\GitHub_Collaboration_Relation_Extraction\main.py", line 102, in <module>
+    obj_collaboration_tuple_list = get_obj_collaboration_tuples_from_record(rec)
+  File "D:\github_repo\GitHub_Collaboration_Relation_Extraction\script\model\Relation_extraction.py", line 128, in get_obj_collaboration_tuples_from_record
+    df_bodyRegLinks_eachLinkPatType = get_df_bodyRegLinks_eachLinkPatType(df_record)
+  File "D:\github_repo\GitHub_Collaboration_Relation_Extraction\script\model\Entity_recognition.py", line 27, in get_df_bodyRegLinks_eachLinkPatType
+    df_local_msg_regexed_dict = get_df_local_msg_regexed_dict(df_local_msg, use_msg_columns=use_msg_columns)
+  File "D:\github_repo\GitHub_Collaboration_Relation_Extraction\script\identify_reference.py", line 260, in get_df_local_msg_regexed_dict
+    df_local_msg_regexed = df_regexed_union_by_patterns(df_local_msg, use_msg_columns, regex_patterns, use_data_conf=USE_REG_SUB_STRS, union_on_col=record_key)
+  File "D:\github_repo\GitHub_Collaboration_Relation_Extraction\script\identify_reference.py", line 204, in df_regexed_union_by_patterns
+    df_regexed_union = df_union_agg_sumlist(df_regexed_list, on_col=union_on_col, union_cols=use_msg_columns, keep_notalllist_notallnum_str='first')
+  File "D:\github_repo\GitHub_Collaboration_Relation_Extraction\script\identify_reference.py", line 159, in df_union_agg_sumlist
+    df_raw_cancat = df_raw_cancat.dropna(axis=0, how='all', subset=union_cols).dropna(axis=0, how='any', subset=key_col)
+  File "C:\Users\10651\AppData\Roaming\Python\Python39\site-packages\pandas\util\_decorators.py", line 331, in wrapper
+    return func(*args, **kwargs)
+  File "C:\Users\10651\AppData\Roaming\Python\Python39\site-packages\pandas\core\frame.py", line 6560, in dropna
+    if check.any():
+  File "C:\Users\10651\AppData\Roaming\Python\Python39\site-packages\numpy\core\_methods.py", line 58, in _any
+    return umr_any(a, axis, dtype, out, keepdims)
+KeyboardInterrupt
+

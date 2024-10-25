@@ -27,7 +27,7 @@ import pandas as pd
 from etc import filePathConf
 
 
-def read_csvs(csv_dir, ignore_empty=True, header='infer', index_col=0, filenames=None, **kwargs):
+def read_csvs(csv_dir, ignore_empty=True, header='infer', index_col=None, filenames=None, **kwargs):
     # read csvs in csv_dir.
     # e.g. If 'filename1.csv', 'filename2.csv' in csv_dir, return {'filename1': df1, 'filename2': df2}
     df_dict = {}
@@ -67,9 +67,9 @@ def read_csvs(csv_dir, ignore_empty=True, header='infer', index_col=0, filenames
 # RESULT4: ['ReleaseEvent']
 def dedup_content(df_repo):  # 数据库存储时将repo_description等信息重复存储，需要过滤，保留首次遇到的值
     type_cols_dict = {
-        'IssuesEvent': ['issue_title', 'body'],  # content: issue_title（action = closed reopened labeled冗余，可只取opened），body（action = closed reopened labeled冗余，可只取opened）
+        'IssuesEvent': ['issue_title', 'body'],  # content: issue_title（action = closed reopened labeled部分冗余，应只取变更部分），body（action = closed reopened labeled部分冗余，应只取变更部分）
         'IssueCommentEvent': ['body'],  # content: body（非冗余）
-        'PullRequestEvent': ['issue_title', 'body'],  # content: issue_title（action = closed reopened labeled冗余，可只取opened）, body（action = closed reopened labeled冗余，可只取opened）
+        'PullRequestEvent': ['issue_title', 'body'],  # content: issue_title（action = closed reopened labeled部分冗余，应只取变更部分）, body（action = closed reopened labeled部分冗余，应只取变更部分）
         'PullRequestReviewEvent': ['body'],  # content: body（非冗余）
         'PullRequestReviewCommentEvent': ['body'],  # content: body（非冗余）
         'PushEvent': ['push_commits.message'],  # content: push_commits.message（非冗余）
@@ -80,7 +80,7 @@ def dedup_content(df_repo):  # 数据库存储时将repo_description等信息重
     required_features = list(set(sum(list(type_cols_dict.values()), ['type', 'action'])))
     if set(list(df_repo.columns)) >= set(required_features):
         temp_df_repo = df_repo.copy()
-        temp_df_repo.loc[temp_df_repo['action'].apply(lambda x: x in ['closed', 'reopened', 'labeled']), ['issue_title', 'body']] = np.nan  # for 'IssuesEvent' and 'PullRequestEvent'
+        # temp_df_repo.loc[temp_df_repo['action'].apply(lambda x: x in ['closed', 'reopened', 'labeled']), ['issue_title', 'body']] = np.nan  # for 'IssuesEvent' and 'PullRequestEvent', the content can be edited!
         temp_df_repo.loc[temp_df_repo['type'].apply(lambda x: x in ['IssueCommentEvent', 'PullRequestReviewEvent', 'PullRequestReviewCommentEvent']), ['issue_title']] = np.nan  # for 'IssuesEvent' and 'PullRequestEvent'
     else:
         print('MissingColumnsError: The required_features:', required_features, '. Got columns:', list(df_repo.columns))
@@ -89,7 +89,7 @@ def dedup_content(df_repo):  # 数据库存储时将repo_description等信息重
 
 
 if __name__ == '__main__':
-    year = 2022
+    # year = 2023
     # tst_repo = ['sqlite/sqlite', 'MariaDB/server', 'mongodb/mongo', 'redis/redis', 'elastic/elasticsearch',
     #             'influxdata/influxdb', 'ClickHouse/ClickHouse', 'apache/hbase']
     # filenames = [s.replace("/", "_") + f'_{year}.csv' for s in tst_repo]
@@ -97,7 +97,7 @@ if __name__ == '__main__':
 
     # 读入csv，去除数据库存储时额外复制的重复issue信息
     dbms_repos_dir = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR], 'repos')
-    df_dbms_repos_raw_dict = read_csvs(dbms_repos_dir, filenames=filenames)
+    df_dbms_repos_raw_dict = read_csvs(dbms_repos_dir, filenames=filenames, index_col=0)
 
     print(len(df_dbms_repos_raw_dict))
 
