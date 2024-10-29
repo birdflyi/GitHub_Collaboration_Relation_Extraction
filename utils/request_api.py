@@ -102,10 +102,10 @@ class RequestGitHubAPI(RequestAPI):
         super().__init__(*args)
         self.url_pat_mode = url_pat_mode or self.__class__.url_pat_mode
         if self.url_pat_mode == 'id':
-            self.user_url_pat = self.__class__.base_url + 'user/{account_id}'  # https://docs.github.com/en/rest/users/users?apiVersion=2022-11-28#get-a-user-using-their-id
+            self.user_url_pat = self.__class__.base_url + 'user/{actor_id}'  # https://docs.github.com/en/rest/users/users?apiVersion=2022-11-28#get-a-user-using-their-id
             self.repo_url_pat = self.__class__.base_url + 'repositories/{repo_id}'  # https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-public-repositories
         elif self.url_pat_mode == 'name':
-            self.user_url_pat = self.__class__.base_url + 'users/{username}'  # https://docs.github.com/en/rest/users/users?apiVersion=2022-11-28#get-a-user
+            self.user_url_pat = self.__class__.base_url + 'users/{actor_login}'  # https://docs.github.com/en/rest/users/users?apiVersion=2022-11-28#get-a-user
             self.repo_url_pat = self.__class__.base_url + 'repos/{owner}/{repo}'  # https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#get-a-repository
         else:
             raise ValueError("url_pat_mode must be in ['id', 'name'].")
@@ -114,7 +114,7 @@ class RequestGitHubAPI(RequestAPI):
     def get_url(self, url_type="repo_ext", ext_pat=None, params=None):
         url = None
         params = params or {}
-        if url_type.startswith("user"):
+        if url_type.startswith("actor") or url_type.startswith("user"):
             url = self.user_url_pat.format(**params)
         elif url_type.startswith("repo"):
             url = self.repo_url_pat.format(**params)

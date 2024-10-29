@@ -98,6 +98,8 @@ def get_actor_id_by_actor_login(actor_login, use_loc_table=USE_LOC_ACTOR_REPO_TA
 
     if query_flag:
         actor_id = _get_field_from_db('actor_id', {'actor_login': actor_login})
+        if not actor_id:
+            actor_id = __get_actor_id_by_actor_login(actor_login)
     return actor_id
 
 
@@ -118,6 +120,8 @@ def get_actor_login_by_actor_id(actor_id, use_loc_table=USE_LOC_ACTOR_REPO_TABLE
 
     if query_flag:
         actor_login = _get_field_from_db('actor_login', {'actor_id': actor_id})
+        if not actor_login:
+            actor_login = __get_actor_login_by_actor_id(actor_id)
     return actor_login
 
 
@@ -138,6 +142,8 @@ def get_repo_id_by_repo_full_name(repo_full_name, use_loc_table=USE_LOC_ACTOR_RE
 
     if query_flag:
         repo_id = _get_field_from_db('repo_id', {'repo_name': repo_full_name})
+        if not repo_id:
+            repo_id = __get_repo_id_by_repo_full_name(repo_full_name)
     return repo_id
 
 
@@ -158,10 +164,65 @@ def get_repo_name_by_repo_id(repo_id, use_loc_table=USE_LOC_ACTOR_REPO_TABLE):
 
     if query_flag:
         repo_name = _get_field_from_db('repo_name', {'repo_id': repo_id})
+        if not repo_name:
+            repo_name = __get_repo_full_name_by_repo_id(repo_id)
     return repo_name
 
 
 # 3. query entity attributes from GitHub API
+
+def __get_actor_id_by_actor_login(actor_login):
+    actor_id = None
+    requestGitHubAPI = RequestGitHubAPI(url_pat_mode="name")
+    url = requestGitHubAPI.get_url("actor", params={"actor_login": actor_login})
+    response = requestGitHubAPI.request(url)
+    if response is not None:
+        data = response.json()
+        actor_id = data.get("id", None)
+    else:
+        print("Empty data.")
+    return actor_id
+
+
+def __get_actor_login_by_actor_id(actor_id):
+    actor_login = None
+    requestGitHubAPI = RequestGitHubAPI(url_pat_mode="id")
+    url = requestGitHubAPI.get_url("actor", params={"actor_id": actor_id})
+    response = requestGitHubAPI.request(url)
+    if response is not None:
+        data = response.json()
+        actor_login = data.get("login", None)
+    else:
+        print("Empty data.")
+    return actor_login
+
+
+def __get_repo_id_by_repo_full_name(repo_name):
+    repo_id = None
+    requestGitHubAPI = RequestGitHubAPI(url_pat_mode="name")
+    url = requestGitHubAPI.get_url("repo", params={"owner": repo_name.split("/")[0], "repo": repo_name.split("/")[-1]})
+    response = requestGitHubAPI.request(url)
+    if response is not None:
+        data = response.json()
+        repo_id = data.get("id", None)
+    else:
+        print("Empty data.")
+    return repo_id
+
+
+def __get_repo_full_name_by_repo_id(repo_id):
+    repo_name = None
+    requestGitHubAPI = RequestGitHubAPI(url_pat_mode="id")
+    url = requestGitHubAPI.get_url("repo", params={"repo_id": repo_id})
+    response = requestGitHubAPI.request(url)
+    if response is not None:
+        data = response.json()
+        repo_name = data.get("full_name", None)
+    else:
+        print("Empty data.")
+    return repo_name
+
+
 def __get_github_userinfo_from_email(email):
     usersinfo = None
 
@@ -326,6 +387,10 @@ if __name__ == '__main__':
 
     # test search entities from DataBase
     res = [
+        __get_actor_id_by_actor_login("X-lab2017"),
+        __get_actor_login_by_actor_id(49427213),
+        __get_repo_id_by_repo_full_name("X-lab2017/open-digger"),
+        __get_repo_full_name_by_repo_id(288431943),
         _get_field_from_db('push_commits.message', {'type': 'PushEvent', 'repo_id': None, 'push_head': 'eced203d53133650123dc944f758c5f8240b45cb'}),
         _get_field_from_db('actor_id', {'type': 'PushEvent', 'push_head': 'eced203d53133650123dc944f758c5f8240b45cb'}),
         _get_field_from_db('body', {'type': 'CommitCommentEvent', 'commit_comment_id': 93389283}),
