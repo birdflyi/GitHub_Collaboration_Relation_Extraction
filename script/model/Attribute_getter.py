@@ -81,7 +81,7 @@ def _get_field_from_db(field, where_param, ret='any', dataframe_format=False):
     return result
 
 
-def get_actor_id_by_login(actor_login, use_loc_table=USE_LOC_ACTOR_REPO_TABLE):
+def get_actor_id_by_actor_login(actor_login, use_loc_table=USE_LOC_ACTOR_REPO_TABLE):
     if actor_login is None:
         return None
 
@@ -99,6 +99,26 @@ def get_actor_id_by_login(actor_login, use_loc_table=USE_LOC_ACTOR_REPO_TABLE):
     if query_flag:
         actor_id = _get_field_from_db('actor_id', {'actor_login': actor_login})
     return actor_id
+
+
+def get_actor_login_by_actor_id(actor_id, use_loc_table=USE_LOC_ACTOR_REPO_TABLE):
+    if actor_id is None:
+        return None
+
+    actor_login = None
+    query_flag = False
+    if use_loc_table:
+        try:
+            actor_login = df_Actor.loc[df_Actor['actor_id'] == actor_id, 'actor_login'].values[0]
+        except:
+            print(f"Can not find {str(actor_id)} in Actor.csv. Try to connect to clickhouse...")
+            query_flag = True
+    else:
+        query_flag = True
+
+    if query_flag:
+        actor_login = _get_field_from_db('actor_login', {'actor_id': actor_id})
+    return actor_login
 
 
 def get_repo_id_by_repo_full_name(repo_full_name, use_loc_table=USE_LOC_ACTOR_REPO_TABLE):
@@ -119,6 +139,26 @@ def get_repo_id_by_repo_full_name(repo_full_name, use_loc_table=USE_LOC_ACTOR_RE
     if query_flag:
         repo_id = _get_field_from_db('repo_id', {'repo_name': repo_full_name})
     return repo_id
+
+
+def get_repo_name_by_repo_id(repo_id, use_loc_table=USE_LOC_ACTOR_REPO_TABLE):
+    if repo_id is None:
+        return None
+
+    repo_name = None
+    query_flag = False
+    if use_loc_table:
+        try:
+            repo_name = df_Repo.loc[df_Repo['repo_id'] == repo_id, 'repo_name'].values[0]
+        except:
+            print(f"Can not find {str(repo_id)} in Repo.csv. Try to connect to clickhouse...")
+            query_flag = True
+    else:
+        query_flag = True
+
+    if query_flag:
+        repo_name = _get_field_from_db('repo_name', {'repo_id': repo_id})
+    return repo_name
 
 
 # 3. query entity attributes from GitHub API
@@ -289,7 +329,7 @@ if __name__ == '__main__':
         _get_field_from_db('push_commits.message', {'type': 'PushEvent', 'repo_id': None, 'push_head': 'eced203d53133650123dc944f758c5f8240b45cb'}),
         _get_field_from_db('actor_id', {'type': 'PushEvent', 'push_head': 'eced203d53133650123dc944f758c5f8240b45cb'}),
         _get_field_from_db('body', {'type': 'CommitCommentEvent', 'commit_comment_id': 93389283}),
-        get_actor_id_by_login('birdflyi'),
+        get_actor_id_by_actor_login('birdflyi'),
         get_repo_id_by_repo_full_name('redis/redis')
     ]
     print(res)

@@ -13,7 +13,7 @@ import types
 import numpy as np
 
 # __get_tag_commit_sha must be imported, see ER_config.event_trigger_ERE_triples_dict
-from script.model.Attribute_getter import _get_field_from_db, get_actor_id_by_login, \
+from script.model.Attribute_getter import _get_field_from_db, get_actor_id_by_actor_login, \
     get_repo_id_by_repo_full_name, __get_commit_parents_sha, __get_tag_commit_sha
 from script.model.ER_config_parser import get_eventType_params_from_joined_str
 
@@ -111,7 +111,7 @@ class ObjEntity(object):
             'U_K': {'actor_id(PK)', 'actor_login'},  # Not None: any
             'U_V': None,
             'D': {'actor_id(PK)': int, 'actor_login': str},
-            'F': {'actor_id': lambda actor_login: get_actor_id_by_login(actor_login),  # execute when actor_id is missing
+            'F': {'actor_id': lambda actor_login: get_actor_id_by_actor_login(actor_login),  # execute when actor_id is missing
                   'actor_login': lambda actor_id: _get_field_from_db('actor_login', {'actor_id': actor_id}),
                   },
         },
@@ -293,7 +293,7 @@ class ObjEntity(object):
             'F': {'repo_id': lambda repo_name: get_repo_id_by_repo_full_name(repo_name),  # execute when repo_id is missing
                   'repo_name': lambda repo_id: _get_field_from_db('repo_name', {'repo_id': repo_id}),
                   '_repo_full_name': lambda repo_name: repo_name,
-                  '_owner_id': lambda repo_name, actor_id=None, actor_login=None: actor_id if actor_login == repo_name.split('/')[0] and ObjEntity.val_not_na(actor_id) else get_actor_id_by_login(repo_name.split('/')[0]),
+                  '_owner_id': lambda repo_name, actor_id=None, actor_login=None: actor_id if actor_login == repo_name.split('/')[0] and ObjEntity.val_not_na(actor_id) else get_actor_id_by_actor_login(repo_name.split('/')[0]),
                   '_name': lambda repo_name: repo_name.split('/')[1],
                   'repo_description': lambda repo_id: _get_field_from_db('repo_description', {'type': 'PullRequestEvent', 'repo_id': repo_id}),
             },

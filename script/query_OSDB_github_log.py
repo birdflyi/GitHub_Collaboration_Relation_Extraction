@@ -28,6 +28,14 @@ from script import columns_simple
 from utils.conndb import ConnDB
 
 
+def get_repo_name_fileformat(repo_name: str):
+    return repo_name.replace('/', '_')
+
+
+def get_repo_year_filename(repo_name_fileformat: str, year):
+    return f"{repo_name_fileformat}_{str(year)}.csv"
+
+
 def query_repo_log_each_year_to_csv_dir(repo_names, columns, save_dir, sql_param=None, update_exist_data=False):
     conndb = ConnDB()
     columns_str = ', '.join(columns)
@@ -48,11 +56,11 @@ def query_repo_log_each_year_to_csv_dir(repo_names, columns, save_dir, sql_param
         SELECT {{columns}} FROM {table} WHERE platform='GitHub' AND {get_year_constraint(year)} AND repo_name='{{repo_name}}';
         '''
         for repo_name in repo_names:
-            repo_name_fileformat = repo_name.replace('/', '_')
             sql_ref_repo = sql_ref_repo_pattern.format(**{"columns": columns_str, "repo_name": repo_name})
             # print(sql_ref_repo)
 
-            filename = f"{repo_name_fileformat}_{year}.csv"
+            repo_name_fileformat = get_repo_name_fileformat(repo_name)
+            filename = get_repo_year_filename(repo_name_fileformat, year)
             save_path = os.path.join(save_dir, filename)
 
             if update_exist_data or not os.path.exists(save_path):

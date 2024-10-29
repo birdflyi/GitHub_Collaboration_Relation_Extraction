@@ -109,7 +109,7 @@ class RequestGitHubAPI(RequestAPI):
             self.repo_url_pat = self.__class__.base_url + 'repos/{owner}/{repo}'  # https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#get-a-repository
         else:
             raise ValueError("url_pat_mode must be in ['id', 'name'].")
-        self.commit_url_pat = self.repo_url_pat + '/git/commits/{commit_sha}'
+        self.commit_url_pat = self.repo_url_pat + '/commits/{commit_sha}'
 
     def get_url(self, url_type="repo_ext", ext_pat=None, params=None):
         url = None

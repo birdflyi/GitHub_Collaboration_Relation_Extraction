@@ -25,12 +25,12 @@ if pkg_rootdir not in sys.path:  # 解决ipynb引用上层路径中的模块时�
 import logging
 
 from etc import filePathConf
-from etc.filePathConf import BASE_DIR
 from script import columns_simple, columns_full
 from script.body_content_preprocessing import read_csvs, dedup_content
 from script.model.Relation_extraction import get_obj_collaboration_tuples_from_record, get_df_collaboration, \
     save_GitHub_Collaboration_Network
-from script.query_OSDB_github_log import query_repo_log_each_year_to_csv_dir
+from script.query_OSDB_github_log import query_repo_log_each_year_to_csv_dir, get_repo_name_fileformat, \
+    get_repo_year_filename
 from utils.logUtils.loadLogConfig import setup_logging
 
 
@@ -57,11 +57,12 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
 
     # Download sample data
-    repo_names = ["elastic/elasticsearch"]
+    repo_names = ["TuGraph-family/tugraph-db"]
     dbms_repos_raw_content_dir = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR], 'repos')
+    year = 2023
     sql_param = {
         "table": "opensource.events",
-        "start_end_year": [2023, 2024],
+        "start_end_year": [year, year + 1],
     }
     query_repo_log_each_year_to_csv_dir(repo_names, columns=columns_simple, save_dir=dbms_repos_raw_content_dir,
                                         sql_param=sql_param)
@@ -71,12 +72,14 @@ if __name__ == '__main__':
     process_body_content(raw_content_dir=dbms_repos_raw_content_dir, processed_content_dir=dbms_repos_dedup_content_dir)
 
     # Relation extraction
-    df_dbms_repos_dict = read_csvs(dbms_repos_dedup_content_dir, index_col=0)
+    repo_names_fileformat = list(map(get_repo_name_fileformat, repo_names))
+    filenames = [get_repo_year_filename(s, year) for s in repo_names_fileformat]
+    df_dbms_repos_dict = read_csvs(dbms_repos_dedup_content_dir, filenames=filenames, index_col=0)
     repo_keys = list(df_dbms_repos_dict.keys())
 
     repo_key_skip_to_loc = 0
-    # rec_add_mode_skip_to_loc = 0
-    rec_add_mode_skip_to_loc = 1326
+    rec_add_mode_skip_to_loc = 0
+    # rec_add_mode_skip_to_loc = 1326
     # limit = 1000
     limit = -1
     I_REPO_KEY = 0
@@ -90,7 +93,7 @@ if __name__ == '__main__':
             if i < repo_key_skip_to_loc:
                 continue
             df_repo = df_dbms_repos_dict[repo_key]
-            save_path = os.path.join(BASE_DIR, f'data/github_osdb_data/result/GitHub_Collaboration_Network_{repo_key}.csv')
+            save_path = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR], f'GitHub_Collaboration_Network_repos/{repo_key}.csv')
             for index, rec in df_repo.iterrows():
                 process_checkpoint[I_RECORD_LOC] = index
                 if limit > 0:

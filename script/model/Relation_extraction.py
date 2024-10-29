@@ -11,7 +11,6 @@ import os
 
 import pandas as pd
 
-from etc.filePathConf import BASE_DIR
 from script.model.Attribute_getter import _get_field_from_db
 from script.model.ER_config_parser import eventType_params2repr, match_substr__from_body, df_ref_tuples_raw, \
     eventType_params
@@ -154,7 +153,7 @@ def get_obj_collaboration_tuples_from_record(record, extract_mode=3):
 def get_df_collaboration(obj_collaboration_tuple_list, extend_field=True):
     columns = ["src_entity_id", "src_entity_type", "tar_entity_id", "tar_entity_type", "relation_label_id",
                "relation_type", "relation_label_repr", "event_id", "event_trigger", "event_type", "event_time"]
-    columns_extend_field = ["tar_entity_match_text", "tar_entity_match_pattern_type"]
+    columns_extend_field = ["tar_entity_match_text", "tar_entity_match_pattern_type", "tar_entity_objnt_prop_dict"]
     if extend_field:
         columns = columns + columns_extend_field
     df_collaboration = pd.DataFrame(columns=columns)
@@ -173,6 +172,7 @@ def get_df_collaboration(obj_collaboration_tuple_list, extend_field=True):
         if extend_field:  # only target entity can be referenced with text
             new_row["tar_entity_match_text"] = getattr(tar_entity, "match_text", None)
             new_row["tar_entity_match_pattern_type"] = getattr(tar_entity, "match_pattern_type", None)
+            new_row["tar_entity_objnt_prop_dict"] = getattr(tar_entity, "objnt_prop_dict", None)
         df_collaboration.loc[len(df_collaboration)] = new_row  # 添加新记录
     return df_collaboration
 
@@ -194,8 +194,8 @@ def save_GitHub_Collaboration_Network(df_collaboration, save_path, add_mode_if_e
 
 
 if __name__ == '__main__':
+    from etc import filePathConf
     from script.model import df_tst
-    from numpy import nan
 
     print(get_obj_collaboration_tuples_from_record(df_tst.to_dict("records")[1]))
 
@@ -219,5 +219,5 @@ if __name__ == '__main__':
     pd.set_option('display.max_columns', None)
     df_collaboration = get_df_collaboration(obj_collaboration_tuple_list, extend_field=True)
     print(df_collaboration)
-    save_path = os.path.join(BASE_DIR, 'data/github_osdb_data/result/GitHub_Collaboration_Network_test.csv')
+    save_path = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR], 'GitHub_Collaboration_Network_repos/test.csv')
     save_GitHub_Collaboration_Network(df_collaboration, save_path=save_path, add_mode_if_exists=False)
