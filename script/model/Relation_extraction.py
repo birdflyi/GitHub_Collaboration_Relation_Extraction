@@ -133,11 +133,17 @@ def get_obj_collaboration_tuples_from_record(record, extract_mode=3):
                             for link_text in body_regexed_links:
                                 # Entity Search
                                 obj_nt_from_body = get_ent_obj_in_link_text(link_pattern_type, link_text, d_record)
-                                if not match_src_nt_from_body:
-                                    temp_obj_collaboration_tuple = (obj_nt_from_fileds, obj_nt_from_body, relation, event)
-                                else:
-                                    temp_obj_collaboration_tuple = (obj_nt_from_body, obj_nt_from_fileds, relation, event)
-                                obj_collaboration_tuple_list.append(temp_obj_collaboration_tuple)
+                                objnt_prop_dict = obj_nt_from_body.get_dict().get("objnt_prop_dict", None)
+                                duplicate_matching = False
+                                if objnt_prop_dict:
+                                    objnt_prop_dict = dict(objnt_prop_dict)
+                                    duplicate_matching = objnt_prop_dict.get("duplicate_matching", False)
+                                if not duplicate_matching:
+                                    if not match_src_nt_from_body:
+                                        temp_obj_collaboration_tuple = (obj_nt_from_fileds, obj_nt_from_body, relation, event)
+                                    else:
+                                        temp_obj_collaboration_tuple = (obj_nt_from_body, obj_nt_from_fileds, relation, event)
+                                    obj_collaboration_tuple_list.append(temp_obj_collaboration_tuple)
                         else:  # pd.isna
                             pass
             else:

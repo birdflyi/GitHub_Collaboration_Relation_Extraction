@@ -354,7 +354,7 @@ def __get_tag_commit_sha_by_GraphQL_API(tag_name, owner, repo):
     QUERY = QUERY.replace("OWNER", "{owner}").replace("REPO", "{repo}").replace("TAG_NAME", "{tag_name}").format(
         **params)
     query_graphql_api = GitHubGraphQLAPI()
-    response = query_graphql_api.request_post(QUERY)
+    response = query_graphql_api.request(QUERY)
     data = response.json()
     try:
         tag_commit_sha = data['data']['repository']['ref']['target']['oid']

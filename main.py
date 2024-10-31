@@ -57,7 +57,7 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
 
     # Download sample data
-    repo_names = ["TuGraph-family/tugraph-db"]
+    repo_names = ["facebook/rocksdb", "TuGraph-family/tugraph-db"][1:2]
     dbms_repos_raw_content_dir = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR], 'repos')
     year = 2023
     sql_param = {
@@ -78,8 +78,11 @@ if __name__ == '__main__':
     repo_keys = list(df_dbms_repos_dict.keys())
 
     repo_key_skip_to_loc = 0
-    rec_add_mode_skip_to_loc = 0
-    # rec_add_mode_skip_to_loc = 1326
+    last_stop_index = -1  # set last_stop_index = -1 if skip nothing
+    # last_stop_index + 1,  this last_stop_index is the index of rows where the raw log file `id` column matches the
+    # `event`_id column in the file result log file.
+    rec_add_mode_skip_to_loc = last_stop_index + 1
+
     # limit = 1000
     limit = -1
     I_REPO_KEY = 0
@@ -105,7 +108,7 @@ if __name__ == '__main__':
                 obj_collaboration_tuple_list = get_obj_collaboration_tuples_from_record(rec)
                 df_collaboration = get_df_collaboration(obj_collaboration_tuple_list, extend_field=True)
                 save_GitHub_Collaboration_Network(df_collaboration, save_path=save_path, add_mode_if_exists=True)
-            logger.info(f"Processing progress: {repo_key}@{i}: task completed!")
+            logger.info(f"Processing progress: {repo_key}@{i}#{process_checkpoint[I_RECORD_LOC]}: task completed!")
             rec_add_mode_skip_to_loc = 0
         logger.info(f"Processing progress: all task completed!")
     except BaseException as e:

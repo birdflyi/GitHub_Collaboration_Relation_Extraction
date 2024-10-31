@@ -130,7 +130,7 @@ def __get_ref_names_by_repo_name(repo_name, query_node_type='tag'):
     d_query = dict(zip(query_node_types[:2], [query_branches, query_tags]))
     query = d_query[query_node_type]
     query_graphql_api = GitHubGraphQLAPI()
-    response = query_graphql_api.request_post(query)
+    response = query_graphql_api.request(query)
     data = response.json()
     parse_branches = lambda data: [branch['name'] for branch in data['data']['repository']['refs']['nodes']]
     parse_tags = lambda data: [e['node']['name'] for e in data['data']['repository']['refs']['edges']]
@@ -156,11 +156,8 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
         d_record = {}
     link_text = str(link_text)
     nt = None
-    d_val = {}
-    d_val["match_text"] = link_text
-    d_val["match_pattern_type"] = link_pattern_type
     objnt_prop_dict = None
-    d_val["objnt_prop_dict"] = objnt_prop_dict
+    d_val = {"match_text": link_text, "match_pattern_type": link_pattern_type, "objnt_prop_dict": objnt_prop_dict}
     default_node_type = "Obj"
     if link_pattern_type == "Issue_PR":
         if re.search(r"#discussion_r\d+(?![\d#/])", link_text) or re.search(
@@ -231,30 +228,35 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
             d_val['repo_name'] = repo_name
             d_val['issue_number'] = issue_number
             d_val['issue_id'] = issue_id
-        else:
+        elif re.search(r".*#0*[1-9][0-9]*(?![\d/#a-z])", link_text):
+            repo_id = None
+            repo_name = None
+            issue_number = None
+            use_record_repo = False
             if re.findall(r"^(?:[Pp][Uu][Ll][Ll]\s?[Rr][Ee][Qq][Uu][Ee][Ss][Tt])(?:#)0*[1-9][0-9]*$", link_text) or \
                     re.findall(r"^(?:[Pp][Rr])(?:#)0*[1-9][0-9]*$", link_text):  # e.g. PR#32
+                use_record_repo = True
                 nt = "PullRequest"
-                repo_id = d_record.get("repo_id")  # 传入record的repo_id字段
-                repo_name = get_repo_name_by_repo_id(repo_id) if repo_id != d_record.get("repo_id") else d_record.get(
-                    "repo_name")
                 issue_number = get_first_match_or_none(r'(?<=#)0*[1-9][0-9]*', link_text)
             elif re.findall(r"^(?:[Ii][Ss][Ss][Uu][Ee][Ss]?)(?:#)0*[1-9][0-9]*$", link_text):  # e.g. issue#32
+                use_record_repo = True
                 nt = "Issue"
-                repo_id = d_record.get("repo_id")  # 传入record的repo_id字段
-                repo_name = get_repo_name_by_repo_id(repo_id) if repo_id != d_record.get("repo_id") else d_record.get(
-                    "repo_name")
                 issue_number = get_first_match_or_none(r'(?<=#)0*[1-9][0-9]*', link_text)
             elif re.findall(r"^(?:#)0*[1-9][0-9]*$", link_text):  # e.g. #782, '#734', '#3221'
-                repo_id = d_record.get("repo_id")  # 传入record的repo_id字段
-                repo_name = get_repo_name_by_repo_id(repo_id) if repo_id != d_record.get("repo_id") else d_record.get(
-                    "repo_name")
                 issue_number = get_first_match_or_none(r'(?<=#)0*[1-9][0-9]*', link_text)
+                if d_record.get("repo_id"):
+                    use_record_repo = True
+                    repo_id = d_record.get("repo_id")  # 传入record的repo_id字段
+                    repo_name = d_record.get("repo_name") or get_repo_name_by_repo_id(repo_id)
+                elif d_record.get("repo_name"):
+                    use_record_repo = True
+                    repo_name = d_record.get("repo_name")
+                    repo_id = d_record.get("repo_id") or get_repo_id_by_repo_full_name(repo_name)
                 nt = get_issue_type_by_repo_id_issue_number(repo_id, issue_number) or "Obj"
-                if nt == "Obj":
-                    objnt_prop_dict = {"numbers": re.findall(r"(?<=#)\d+", link_text)}
+
             elif re.findall(r"^(?:[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*#)\d+$",
                             link_text):  # e.g. redis/redis-doc#1711
+                use_record_repo = False  # repo_name is in link_text
                 repo_name = get_first_match_or_none(r'[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*(?=#)',
                                                     link_text)
                 repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
@@ -263,14 +265,32 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                 nt = get_issue_type_by_repo_id_issue_number(repo_id, issue_number) or "Obj"
             else:
                 nt = "Obj"  # obj e.g. 'RB#26080', 'BUG#32134875', 'BUG#31553323'
+                objnt_prop_dict = {"numbers": re.findall(r"(?<=#)\d+", link_text)}
+                if link_text.startswith('http'):  # 以http开头必可被其他pattern识别，此处被重复识别
+                    objnt_prop_dict["label"] = "Text_Locator"
+                    objnt_prop_dict["duplicate_matching"] = True
+
+            if nt == "Obj":
+                use_record_repo = False
                 repo_id = None
                 repo_name = None
                 issue_number = None
                 objnt_prop_dict = {"numbers": re.findall(r"(?<=#)\d+", link_text)}
+
+            if use_record_repo:
+                if d_record.get("repo_id"):
+                    repo_id = repo_id or d_record.get("repo_id")  # 传入record的repo_id字段
+                    repo_name = repo_name or d_record.get("repo_name") or get_repo_name_by_repo_id(repo_id)
+                if d_record.get("repo_name"):
+                    repo_name = repo_name or d_record.get("repo_name")
+                    repo_id = repo_id or d_record.get("repo_id") or get_repo_id_by_repo_full_name(repo_name)
+
             d_val['repo_id'] = repo_id
             d_val['repo_name'] = repo_name
             d_val['issue_number'] = issue_number
             d_val["objnt_prop_dict"] = objnt_prop_dict
+        else:  # should never be reached
+            pass
     elif link_pattern_type == "SHA":
         if re.search(r"/commits?/[0-9a-fA-F]{40}$", link_text):
             nt = "Commit"
@@ -286,55 +306,96 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
             d_val['commit_sha'] = commit_sha
         elif re.search(r"^[0-9a-fA-F]{40}$", link_text):
             repo_id = d_record.get("repo_id")
-            repo_name = get_repo_name_by_repo_id(repo_id) if repo_id != d_record.get("repo_id") else d_record.get(
-                "repo_name")
+            repo_name = d_record.get("repo_name")
+            if repo_id:
+                repo_name = repo_name or get_repo_name_by_repo_id(repo_id)
+            if repo_name:
+                repo_id = repo_id or get_repo_id_by_repo_full_name(repo_name)
+
             commit_sha = link_text
             # 使用clickhouse查询；另一种判断方式：使用api判断是否为本仓库的commit https://api.github.com/repos/{repo_name}/git/commits/{sha}
             is_inner_commit_sha = _get_field_from_db('TRUE',
                                                      {'repo_id': repo_id, 'push_head': commit_sha})  # 本仓库的Commit
-            if not is_inner_commit_sha and repo_id:
+            is_outer_commit_sha = False
+            # if not is_inner_commit_sha:
+            #     # 可在clickhouse中查询到的Commit，会超出clickhouse的最大内存限制
+            #     repo_id_ck = _get_field_from_db('repo_id', {'push_head': commit_sha})
+            #     if repo_id_ck:
+            #         repo_id = repo_id_ck
+            #         repo_name = get_repo_name_by_repo_id(repo_id)
+            #         is_outer_commit_sha = True
+            find_sha_by_ck = is_inner_commit_sha or is_outer_commit_sha
+            if not find_sha_by_ck:  # is_inner_commit_sha and is_outer_commit_sha == False
                 requestGitHubAPI = RequestGitHubAPI(url_pat_mode='id')
                 get_commit_url = requestGitHubAPI.get_url("commit", params={"repo_id": repo_id, "commit_sha": commit_sha})
                 response = requestGitHubAPI.request(get_commit_url)
                 if response:
                     commit_sha = response.json().get('sha', None)
-                    is_inner_commit_sha = True
-
-            if is_inner_commit_sha:
+                    is_inner_commit_sha = True  # repo_id, repo_name保持不变
+                else:
+                    response = None  # 由于Clickhouse在仅知道sha情况下查询日志会超出内存限制，而GitHub API查询完整sha需要repo_id，因此repo_id未知时不再作直接根据sha查询记录的尝试
+                    is_outer_commit_sha = bool(response)
+            find_sha_by_api = is_inner_commit_sha or is_outer_commit_sha
+            if find_sha_by_ck or find_sha_by_api:
                 nt = "Commit"
-                d_val['repo_id'] = repo_id
-                d_val['repo_name'] = repo_name
-                d_val['commit_sha'] = commit_sha
             else:
                 nt = "Obj"
-                objnt_prop_dict = {"sha": commit_sha}
+                repo_id = None
+                repo_name = None
+                commit_sha = None
+                objnt_prop_dict = {"sha": link_text}
                 d_val["objnt_prop_dict"] = objnt_prop_dict
+            d_val['repo_id'] = repo_id
+            d_val['repo_name'] = repo_name
+            d_val['commit_sha'] = commit_sha
         elif re.search(r"^[0-9a-fA-F]{7}$", link_text):
             repo_id = d_record.get("repo_id")
-            repo_name = get_repo_name_by_repo_id(repo_id) if repo_id != d_record.get("repo_id") else d_record.get("repo_name")
+            repo_name = d_record.get("repo_name")
+            if repo_id:
+                repo_name = repo_name or get_repo_name_by_repo_id(repo_id)
+            if repo_name:
+                repo_id = repo_id or get_repo_id_by_repo_full_name(repo_name)
             sha_abbr_7 = link_text
             conndb = ConnDB()
             sql = f"select push_head from opensource.events where platform='GitHub' and repo_id={repo_id} and push_head like '{sha_abbr_7}%' limit 1"
             df_rs = conndb.query(sql)
             commit_sha = df_rs.iloc[0, 0] if len(df_rs) else None
-            is_inner_commit_sha_abbr_7 = len(df_rs) > 0
-            if not is_inner_commit_sha_abbr_7 and repo_id:
+            is_inner_commit_sha = len(df_rs) > 0
+            is_outer_commit_sha = False
+            # if not is_inner_commit_sha:
+            #     # 可在clickhouse中查询到的Commit，会超出clickhouse的最大内存限制
+            #     sql = f"select repo_id,push_head from opensource.events where platform='GitHub' and push_head like '{sha_abbr_7}%' limit 1"
+            #     df_rs = conndb.query(sql)
+            #     repo_id_ck = df_rs.iloc[0, 0] if len(df_rs) else None
+            #     commit_sha = df_rs.iloc[0, 1] if len(df_rs) else None
+            #     if repo_id_ck:
+            #         repo_id = repo_id_ck
+            #         repo_name = get_repo_name_by_repo_id(repo_id)
+            #         is_outer_commit_sha = True
+            find_sha_by_ck = is_inner_commit_sha or is_outer_commit_sha
+            if not find_sha_by_ck:  # is_inner_commit_sha and is_outer_commit_sha == False
                 requestGitHubAPI = RequestGitHubAPI(url_pat_mode='id')
                 get_commit_url = requestGitHubAPI.get_url("commit", params={"repo_id": repo_id, "commit_sha": sha_abbr_7})
                 response = requestGitHubAPI.request(get_commit_url)
                 if response:
                     commit_sha = response.json().get('sha', None)
-                    is_inner_commit_sha_abbr_7 = True
-
-            if is_inner_commit_sha_abbr_7:
+                    is_inner_commit_sha = True
+                else:  # response为空，sha与d_record的repo_id不匹配
+                    response = None  # 由于Clickhouse在仅知道sha情况下查询日志会超出内存限制，而GitHub API查询完整sha需要repo_id，因此repo_id未知时不再作直接根据sha查询记录的尝试
+                    is_outer_commit_sha = bool(response)
+            find_sha_by_api = is_inner_commit_sha or is_outer_commit_sha
+            if find_sha_by_ck or find_sha_by_api:
                 nt = "Commit"
-                d_val['repo_id'] = repo_id
-                d_val['repo_name'] = repo_name
-                d_val['commit_sha'] = commit_sha
             else:
                 nt = "Obj"
-                objnt_prop_dict = {"sha_abbr_7": sha_abbr_7}
+                repo_id = None
+                repo_name = None
+                commit_sha = None
+                objnt_prop_dict = {"sha_abbr_7": link_text}
                 d_val["objnt_prop_dict"] = objnt_prop_dict
+            d_val['repo_id'] = repo_id
+            d_val['repo_name'] = repo_name
+            d_val['commit_sha'] = commit_sha
         else:
             pass  # should never be reached
     elif link_pattern_type == "Actor":
@@ -373,6 +434,10 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
             nt = "Repo"
             repo_name = get_first_match_or_none(
                 r'(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*(?![-_A-Za-z0-9\./])', link_text)
+            if repo_name.endswith(".git"):
+                repo_name = repo_name[:-4]
+            elif repo_name.endswith("."):
+                repo_name = repo_name[:-1]
             repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                 "repo_name") else d_record.get("repo_id")
             d_val["repo_name"] = repo_name
@@ -385,8 +450,6 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                 r'(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*(?![-_A-Za-z0-9\.])', link_text)
             repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                 "repo_name") else d_record.get("repo_id")
-            d_val["repo_name"] = repo_name
-            d_val["repo_id"] = repo_id
 
             Branch_Tag_GHDir_name = get_first_match_or_none(r'(?<=tree/)[^\s#]+$', link_text)
             if Branch_Tag_GHDir_name:
@@ -402,10 +465,18 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                         d_val["tag_name"] = Branch_Tag_GHDir_name
                     else:
                         nt = "Obj"  # GitHub_Dir
-                        objnt_prop_dict = {"label": "GitHub_Dir"}
+
+                        if str(Branch_Tag_GHDir_name).__contains__("#"):
+                            label = "Text_Locator"
+                        else:
+                            label = "GitHub_Dir"
+                        objnt_prop_dict = {"label": label}
                         d_val["objnt_prop_dict"] = objnt_prop_dict
             else:
                 nt = "Obj"
+
+            d_val["repo_name"] = repo_name
+            d_val["repo_id"] = repo_id
         else:
             pass  # should never be reached
     elif link_pattern_type == "CommitComment":
@@ -470,9 +541,9 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
 
     if d_val.get("repo_id"):
         objnt_prop_dict = {"repo_name": d_val.get("repo_name"), "repo_id": d_val.get("repo_id")}
-        temp_d = d_val.get("objnt_prop_dict", None)
-        if temp_d:
-            objnt_prop_dict.update(temp_d)
+        d_extra_prop = d_val.get("objnt_prop_dict", None)
+        if d_extra_prop:
+            objnt_prop_dict.update(d_extra_prop)
     d_val["objnt_prop_dict"] = objnt_prop_dict
     ent_obj = ObjEntity(nt)
     ent_obj.set_val(d_val)
@@ -501,7 +572,8 @@ if __name__ == '__main__':
         "Issue_PR_3 strs_all subs": [
             'https://github.com/openframeworks/openFrameworks/pull/7383/files/1f9efefc25685f062c03ebfbd2832c6e47481d01#r1411384813',
             'https://github.com/openframeworks/openFrameworks/pull/7383/files#r1411384813'],
-        "Issue_PR_4 strs_all subs": ['#782', 'RB#26080', 'BUG#32134875', 'BUG#31553323', '#734', '#3221', 'issue#32'],
+        "Issue_PR_4 strs_all subs": ['https://github.com/facebook/rocksdb/blob/main/HISTORY.md#840', '#782', 'RB#26080',
+                                     'BUG#32134875', 'BUG#31553323', '#734', '#3221', 'issue#32'],
         "SHA_0 strs_all subs": [
             'https://github.com/X-lab2017/open-galaxy/pull/2/commits/7f9f3706abc7b5a9ad37470519f5066119ba46c2'],
         "SHA_1 strs_all subs": ['https://www.github.com/xxx/xx/commit/5c9a6c06871cb9fe42814af9c039eb6da5427a6e'],
@@ -511,10 +583,15 @@ if __name__ == '__main__':
         "Actor_1 strs_all subs": ['@danxmoran1', '@danxmoran2', '@danxmoran3', '@birdflyi', '@author', '@danxmoran4',
                                   '@danxmoran5'],
         "Actor_2 strs_all subs": ['author@abc.com'],
-        "Repo_0 strs_all subs": ['https://github.com/X-lab2017/open-research'],
-        "Branch_Tag_GHDir_0 strs_all subs": ['https://github.com/birdflyi/test/tree/\'"-./()<>!%40',
-                                       'https://github.com/openframeworks/openFrameworks/tree/master',
-                                       'https://github.com/birdflyi/test/tree/v\'"-./()<>!%40%2540'],
+        "Repo_0 strs_all subs": ['https://github.com/TW-Genesis/rocksdb-bench.git', 'https://github.com/afs/TDB3.git',
+                                 'https://github.com/tikv/rocksdb.', 'https://github.com/intel/ipp-crypto.',
+                                 'https://github.com/X-lab2017/open-research'],
+        "Branch_Tag_GHDir_0 strs_all subs": [
+            'https://github.com/elastic/elasticsearch/tree/main/docs#test-code-snippets',
+            'https://github.com/artificialinc/elasticsearch/tree/aidan/8-10-0-default-azure-credential',
+            'https://github.com/birdflyi/test/tree/\'"-./()<>!%40',
+            'https://github.com/openframeworks/openFrameworks/tree/master',
+            'https://github.com/birdflyi/test/tree/v\'"-./()<>!%40%2540'],
         "CommitComment_0 strs_all subs": [
             'https://github.com/JuliaLang/julia/commit/5a904ac97a89506456f5e890b8dabea57bd7a0fa#commitcomment-144873925'],
         "Gollum_0 strs_all subs": ['https://github.com/activescaffold/active_scaffold/wiki/API:-FieldSearch'],
@@ -525,9 +602,11 @@ if __name__ == '__main__':
         "GitHub_Files_FileChanges_1 strs_all subs": [
             'https://github.com/X-lab2017/open-digger/pull/997/files#diff-5cda5bb2aa8682c3b9d4dbf864efdd6100fe1a5f748941d972204412520724e5'],
         "GitHub_Files_FileChanges_2 strs_all subs": [
+            'https://github.com/facebook/rocksdb/blob/main/HISTORY.md#840-06262023',
             'https://github.com/birdflyi/Research-Methods-of-Cross-Science/blob/main/%E4%BB%8E%E7%A7%91%E5%AD%A6%E8%B5%B7%E6%BA%90%E7%9C%8B%E4%BA%A4%E5%8F%89%E5%AD%A6%E7%A7%91.md'],
         "GitHub_Other_Links_0 strs_all subs": ['https://github.com/X-lab2017/open-digger/labels/pull%2Fhypertrons'],
         "GitHub_Other_Service_0 strs_all subs": ['https://gist.github.com/birdflyi'],
+        "GitHub_Other_Service_1 strs_all subs": ['https://github.com/apps/dependabot'],
         "GitHub_Service_External_Links_0 strs_all subs": ['http://sqlite.org/forum/forumpost/fdb0bb7ad0',
                                                           'https://sqlite.org/forum/forumpost/fdb0bb7ad0']
     }
@@ -536,8 +615,11 @@ if __name__ == '__main__':
     print(re.findall(re_ref_patterns["Issue_PR"][0], link_text))
     results = []
     for link_pattern_type in re_ref_patterns.keys():
-        for link in re.findall(re_ref_patterns["Issue_PR"][0], link_text):
-            obj = get_ent_obj_in_link_text(link_pattern_type, link, d_record=None)
+        for link in re.findall(re_ref_patterns[link_pattern_type][4], link_text):
+            obj = get_ent_obj_in_link_text(link_pattern_type, link, d_record={'repo_name': 'X-lab2017/open-digger'})
             results.append(obj)
         break
     print(results[0].__dict__)
+    obj = get_ent_obj_in_link_text("SHA", "50982bb7b64d620c9e5270930cc2963a2f97100e",
+                                   d_record={'repo_name': 'TuGraph-family/tugraph-db'})
+    print(obj.get_dict())

@@ -23,11 +23,13 @@ class RequestAPI:
     username = ''
     password = ''
     query = None  # for post json
+    default_method = 'GET'
 
-    def __init__(self, auth_type='token', token=None, headers=None, username=None, password=None, query=None):
+    def __init__(self, auth_type='token', token=None, headers=None, username=None, password=None, query=None, method=None):
         self.auth_type = auth_type  # 'token', 'password'
         self.base_url = self.__class__.base_url
         self.query = query or self.__class__.query
+        self.method = method or self.__class__.default_method
         if self.auth_type == 'token':
             self.token = token or self.__class__.token
             self.headers = headers or self.__class__.headers
@@ -38,7 +40,8 @@ class RequestAPI:
         else:
             raise ValueError("auth_type must be in ['token', 'password'].")
 
-    def request_get(self, url):
+    def request_get(self, url=None):
+        url = url or self.base_url
         if self.auth_type == 'token':
             response = requests.get(url, headers=self.headers)
         elif self.auth_type == 'password':
@@ -47,25 +50,27 @@ class RequestAPI:
             raise ValueError("auth_type must be in ['token', 'password'].")
         return response
 
-    def request_post(self, base_url, query):
+    def request_post(self, query, base_url=None):
+        self.base_url = base_url or self.base_url
         self.query = query or self.query
         if self.auth_type == 'token':
             # print(base_url, self.query, self.headers)
-            response = requests.post(base_url, json={'query': self.query}, headers=self.headers)
+            response = requests.post(self.base_url, json={'query': self.query}, headers=self.headers)
         elif self.auth_type == 'password':
-            response = requests.post(base_url, json={'query': self.query}, auth=self.auth)
+            response = requests.post(self.base_url, json={'query': self.query}, auth=self.auth)
         else:
             raise ValueError("auth_type must be in ['token', 'password'].")
         return response
 
-    def request(self, url, method='GET', retry=2, default_break=60, **kwargs):
-        method = method.upper()
-        while retry:
+    def request(self, url, method=None, retry=1, default_break=60, query=None):
+        self.method = method or self.method
+        self.method = self.method.upper()
+        while retry >= 0:
             try:
-                if method == 'GET':
+                if self.method == 'GET':
                     response = self.request_get(url)
-                elif method == 'POST':
-                    response = self.request_post(base_url=url, query=kwargs.get("query"))
+                elif self.method == 'POST':
+                    response = self.request_post(base_url=url, query=query)
                 else:
                     raise ValueError(f"The {method} should be in ['GET', 'POST']!")
             except requests.exceptions.ProxyError as e:
@@ -90,13 +95,14 @@ class RequestAPI:
 
 class RequestGitHubAPI(RequestAPI):
     base_url = 'https://api.github.com/'
-    url_pat_mode = 'name'
     token = GITHUB_TOKEN
     headers = {
         "Accept": "application/vnd.github.v3+json",
         "Authorization": f"token {token}",
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.4; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2225.0 Safari/537.36'
     }
+    default_method = 'GET'
+    url_pat_mode = 'name'
 
     def __init__(self, url_pat_mode=None, *args):
         super().__init__(*args)
@@ -135,15 +141,14 @@ class GitHubGraphQLAPI(RequestAPI):
         'Content-Type': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.4; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2225.0 Safari/537.36'
     }
-    query = None
+    default_method = 'POST'
 
     def __init__(self, *args):
         super().__init__(*args)
 
-    def request_post(self, query, base_url=None):
-        self.base_url = base_url or self.base_url
-        self.query = query or self.query
-        return super().request_post(self.base_url, self.query)
+    def request(self, query, url=None, method=None, retry=1, default_break=60):
+        url = url or self.base_url
+        return super().request(query=query, url=url, method=method, retry=retry, default_break=default_break)
 
 
 if __name__ == '__main__':
@@ -170,6 +175,6 @@ if __name__ == '__main__':
     }
     """ % (repo_name.split('/')[0], repo_name.split('/')[1])
     query_graphql_api = GitHubGraphQLAPI()
-    response = query_graphql_api.request_post(query_tags)
+    response = query_graphql_api.request(query_tags)
     data = response.json()
     print(data)
