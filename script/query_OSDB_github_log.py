@@ -65,9 +65,12 @@ def query_repo_log_each_year_to_csv_dir(repo_names, columns, save_dir, sql_param
 
             if update_exist_data or not os.path.exists(save_path):
                 conndb.sql = sql_ref_repo
-                conndb.execute()
-                conndb.rs.to_csv(save_path)
-
+                try:
+                    conndb.execute()
+                    conndb.rs.to_csv(save_path)
+                except BaseException as e:
+                    print(f"{filename} is skipped due to an unexpected error: {e.__class__.__name__}!")
+                    return
                 print(f"{filename} saved!")
             else:
                 print(f"{filename} exists!")

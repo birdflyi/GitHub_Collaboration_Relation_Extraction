@@ -13,7 +13,7 @@ import pandas as pd
 
 from etc.filePathConf import BASE_DIR
 from utils.conndb import ConnDB
-from utils.prepare_sql import get_params_condition
+from utils.prepare_sql import get_params_condition, format_sql
 from utils.request_api import RequestGitHubAPI, GitHubGraphQLAPI
 
 USE_LOC_ACTOR_REPO_TABLE = False
@@ -30,19 +30,25 @@ def prepare_loc_actor_repo_table():
         conndb = ConnDB()
         if UPDATE_LOC_ACTOR_REPO_TABLE or not os.path.exists(path_Actor):
             # 更新Actor.csv
-            conndb.sql = """select DISTINCT(actor_id) as actor_id, anyHeavy(actor_login) as actor_login from opensource.events WHERE platform='GitHub' GROUP BY actor_id ORDER BY actor_id;"""
-            conndb.execute()
-            conndb.rs.to_csv(path_Actor, encoding='utf-8')
-            df_Actor = conndb.rs
+            conndb.sql = """SELECT DISTINCT(actor_id) AS actor_id, anyHeavy(actor_login) AS actor_login FROM opensource.events WHERE platform='GitHub' GROUP BY actor_id ORDER BY actor_id;"""
+            try:
+                conndb.execute()
+                conndb.rs.to_csv(path_Actor, encoding='utf-8')
+            except BaseException as e:
+                print(f"{path_Actor} is not updated due to an unexpected error: {e.__class__.__name__}!")
+            df_Actor = pd.DataFrame() if conndb.rs is None else conndb.rs
         else:
             df_Actor = pd.read_csv(path_Actor, encoding='utf-8')
 
         if UPDATE_LOC_ACTOR_REPO_TABLE or not os.path.exists(path_Repo):
             # 更新Repo.csv created_at只取一年的，避免超出内存上限的查询错误
-            conndb.sql = """select repo_id, repo_name from opensource.events WHERE platform='GitHub' and created_at between '2023-01-01 00:00:00' and '2024-01-01 00:00:00' group by repo_id, repo_name;"""
-            conndb.execute()
-            conndb.rs.to_csv(path_Repo, encoding='utf-8')
-            df_Repo = conndb.rs
+            conndb.sql = """SELECT repo_id, repo_name FROM opensource.events WHERE platform='GitHub' AND created_at BETWEEN '2023-01-01 00:00:00' AND '2024-01-01 00:00:00' GROUP BY repo_id, repo_name;"""
+            try:
+                conndb.execute()
+                conndb.rs.to_csv(path_Repo, encoding='utf-8')
+            except BaseException as e:
+                print(f"{path_Repo} is not updated due to an unexpected error: {e.__class__.__name__}!")
+            df_Repo = pd.DataFrame() if conndb.rs is None else conndb.rs
         else:
             df_Repo = pd.read_csv(path_Repo, encoding='utf-8')
     return df_Actor, df_Repo
@@ -52,19 +58,28 @@ df_Actor, df_Repo = prepare_loc_actor_repo_table()
 
 
 # 2. query entity attributes from DataBase
-def _get_field_from_db(field, where_param, ret='any', dataframe_format=False):
+def _get_field_from_db(field, where_param, ret='any', dataframe_format=False, **kwargs):
     if "platform" not in where_param.keys():
         where_param = dict({"platform": 'GitHub'}, **where_param)
     where_param_trimed = {k: v for k, v in where_param.items() if v is not None}
-    sql = f"SELECT {field} FROM opensource.events WHERE {get_params_condition(where_param_trimed)}"
+    params_condition = get_params_condition(where_param_trimed)
+    sql_params = dict(kwargs) if kwargs else {}
+    sql_params["columns"] = field
+    sql_params["table"] = kwargs.get('table', 'opensource.events')
+    sql_params["params_condition"] = params_condition
     if ret == 'any':
-        sql += ' LIMIT 1'
+        sql_params["limit"] = 1
+    sql = format_sql(sql_params)
 
     conndb = ConnDB()
-    df_rs = conndb.query(sql)
-    # print(field, where_param, sql)
+    conndb.sql = sql
+    try:
+        conndb.execute()
+    except BaseException as e:
+        print(f"An unexpected error occurred: {e.__class__.__name__}! The query sql: {sql}.")
+    df_rs = pd.DataFrame() if conndb.rs is None else conndb.rs
     if not len(df_rs):
-        return None
+        return None if not dataframe_format else pd.DataFrame()
 
     if ret in ['first', 'any']:
         result = df_rs.iloc[0]
@@ -237,6 +252,22 @@ def __get_github_userinfo_from_email(email):
     else:
         print("Empty data.")
     return usersinfo
+
+
+def __get_issue_type(repo_id, issue_number):
+    requestGitHubAPI = RequestGitHubAPI(url_pat_mode="id")
+    url = f"https://api.github.com/repositories/{repo_id}/issues/{issue_number}"
+    response = requestGitHubAPI.request(url)
+    issue_type = None
+    if response is not None:
+        issue_data = response.json()
+        if issue_data.get('pull_request', None) is None:
+            issue_type = 'Issue'
+        else:
+            issue_type = 'PullRequest'
+    else:
+        print("Empty data.")
+    return issue_type
 
 
 # https://github.com/X-lab2017/open-digger/commit/e5b25fba712a6d675fbf8328ef44ae0e1a8e377e

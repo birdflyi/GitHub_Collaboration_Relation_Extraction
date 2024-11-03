@@ -57,7 +57,7 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
 
     # Download sample data
-    repo_names = ["facebook/rocksdb", "TuGraph-family/tugraph-db"][1:2]
+    repo_names = ["facebook/rocksdb", "TuGraph-family/tugraph-db"][0:1]
     dbms_repos_raw_content_dir = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR], 'repos')
     year = 2023
     sql_param = {
