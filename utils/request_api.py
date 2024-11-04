@@ -125,11 +125,13 @@ class GitHubTokenPool:
         return self.minTime_tokenState['token']
 
     def update_GithubTokenState_list(self, token, response):
+        if not response:
+            return None
         for i, tokenState in enumerate(self.tokenState_list):
             if token == tokenState['token']:
-                if response.status_code == 429:
-                    tokenState['remaining'] = 0
-                elif 'X-RateLimit-Remaining' in response.headers:
+                # if response.status_code == 429:
+                #     tokenState['remaining'] = 0
+                if 'X-RateLimit-Remaining' in response.headers:
                     tokenState['remaining'] = int(response.headers['X-RateLimit-Remaining'])
 
                 if 'X-RateLimit-Reset' in response.headers:
@@ -138,7 +140,7 @@ class GitHubTokenPool:
                     tokenState['reset'] = int(time.time()) + int(response.headers['Retry-After']) + 1
 
                 self.tokenState_list[i] = tokenState
-        return self.tokenState_list
+        return None
 
 
 class RequestGitHubAPI(RequestAPI):
