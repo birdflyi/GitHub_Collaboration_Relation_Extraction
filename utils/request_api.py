@@ -11,7 +11,7 @@ import requests
 import time
 
 
-GITHUB_TOKEN = 'YOUR_GITHUB_TOKEN'
+GITHUB_TOKENS = ['GITHUB_TOKEN_1', 'GITHUB_TOKEN_2']
 
 
 class RequestAPI:
@@ -39,6 +39,10 @@ class RequestAPI:
             self.auth = (self.username, self.password)
         else:
             raise ValueError("auth_type must be in ['token', 'password'].")
+
+    def update_headers(self):
+        self.headers['Authorization'] = f"token {self.token}"
+        return None
 
     def request_get(self, url=None):
         url = url or self.base_url
@@ -93,9 +97,54 @@ class RequestAPI:
         return None
 
 
+class GitHubTokenPool:
+
+    def __init__(self, github_tokens=None):
+        self.github_tokens = github_tokens or GITHUB_TOKENS
+        self.tokenState_list = self.init_tokenState_list()
+        self.minTime_tokenState = {"token": '', "remaining": 0, "reset": float(time.time())}
+
+    def init_tokenState_list(self):
+        return [{"token": token, "remaining": 1, "reset": float(time.time())} for token in self.github_tokens]
+
+    def get_GithubToken(self):
+        if not self.tokenState_list:
+            self.tokenState_list = self.init_tokenState_list()
+
+        for tokenState in self.tokenState_list:
+            if tokenState['remaining'] > 0:
+                return tokenState['token']
+            elif self.minTime_tokenState['reset'] > tokenState['reset']:
+                self.minTime_tokenState = tokenState
+
+        sleep_time = int(self.minTime_tokenState['reset'] - time.time())
+        if sleep_time > 0:
+            print(f'Sleep {str(sleep_time)} sec')
+            time.sleep(sleep_time)
+
+        return self.minTime_tokenState['token']
+
+    def update_GithubTokenState_list(self, token, response):
+        for i, tokenState in enumerate(self.tokenState_list):
+            if token == tokenState['token']:
+                if response.status_code == 429:
+                    tokenState['remaining'] = 0
+                elif 'X-RateLimit-Remaining' in response.headers:
+                    tokenState['remaining'] = int(response.headers['X-RateLimit-Remaining'])
+
+                if 'X-RateLimit-Reset' in response.headers:
+                    tokenState['reset'] = int(response.headers['X-RateLimit-Reset'])
+                elif 'Retry-After' in response.headers:
+                    tokenState['reset'] = int(time.time()) + int(response.headers['Retry-After']) + 1
+
+                self.tokenState_list[i] = tokenState
+        return self.tokenState_list
+
+
 class RequestGitHubAPI(RequestAPI):
     base_url = 'https://api.github.com/'
-    token = GITHUB_TOKEN
+    token_pool = GitHubTokenPool()
+    token = token_pool.github_tokens[0] if token_pool.github_tokens else ''
     headers = {
         "Accept": "application/vnd.github.v3+json",
         "Authorization": f"token {token}",
@@ -104,8 +153,9 @@ class RequestGitHubAPI(RequestAPI):
     default_method = 'GET'
     url_pat_mode = 'name'
 
-    def __init__(self, url_pat_mode=None, *args):
-        super().__init__(*args)
+    def __init__(self, url_pat_mode=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.token_pool = kwargs.get("token_pool", None) or self.__class__.token_pool
         self.url_pat_mode = url_pat_mode or self.__class__.url_pat_mode
         if self.url_pat_mode == 'id':
             self.user_url_pat = self.__class__.base_url + 'user/{actor_id}'  # https://docs.github.com/en/rest/users/users?apiVersion=2022-11-28#get-a-user-using-their-id
@@ -116,6 +166,7 @@ class RequestGitHubAPI(RequestAPI):
         else:
             raise ValueError("url_pat_mode must be in ['id', 'name'].")
         self.commit_url_pat = self.repo_url_pat + '/commits/{commit_sha}'
+        self.blob_url_pat = self.repo_url_pat + '/git/blobs/{sha}'
 
     def get_url(self, url_type="repo_ext", ext_pat=None, params=None):
         url = None
@@ -132,10 +183,19 @@ class RequestGitHubAPI(RequestAPI):
             url += ext_pat.format(**params)
         return url
 
+    def request(self, url, method=None, retry=1, default_break=60, query=None):
+        url = url or self.base_url
+        self.token = self.token_pool.get_GithubToken()
+        self.update_headers()
+        response = RequestAPI.request(self, url=url, method=method, retry=retry, default_break=default_break, query=query)
+        self.token_pool.update_GithubTokenState_list(self.token, response)
+        return response
+
 
 class GitHubGraphQLAPI(RequestAPI):
     base_url = 'https://api.github.com/graphql'
-    token = GITHUB_TOKEN
+    token_pool = GitHubTokenPool()
+    token = token_pool.github_tokens[0] if token_pool.github_tokens else ''
     headers = {
         'Authorization': 'bearer ' + token,
         'Content-Type': 'application/json',
@@ -143,12 +203,17 @@ class GitHubGraphQLAPI(RequestAPI):
     }
     default_method = 'POST'
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.token_pool = kwargs.get("token_pool", None) or self.__class__.token_pool
 
     def request(self, query, url=None, method=None, retry=1, default_break=60):
         url = url or self.base_url
-        return super().request(query=query, url=url, method=method, retry=retry, default_break=default_break)
+        self.token = self.token_pool.get_GithubToken()
+        self.update_headers()
+        response = RequestAPI.request(self, query=query, url=url, method=method, retry=retry, default_break=default_break)
+        self.token_pool.update_GithubTokenState_list(self.token, response)
+        return response
 
 
 if __name__ == '__main__':
@@ -175,6 +240,12 @@ if __name__ == '__main__':
     }
     """ % (repo_name.split('/')[0], repo_name.split('/')[1])
     query_graphql_api = GitHubGraphQLAPI()
+    print(query_graphql_api.token_pool.tokenState_list)
     response = query_graphql_api.request(query_tags)
     data = response.json()
-    print(data)
+    print(bool(data))
+    print(query_graphql_api.token_pool.tokenState_list)
+    response = query_graphql_api.request(query_tags)
+    data = response.json()
+    print(bool(data))
+    print(query_graphql_api.token_pool.tokenState_list)
