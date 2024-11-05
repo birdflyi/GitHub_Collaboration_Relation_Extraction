@@ -565,11 +565,34 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
         d_val["repo_id"] = repo_id
     elif link_pattern_type == "GitHub_Other_Links":
         nt = "Obj"
-        repo_name = get_first_match_or_none(r'(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*', link_text)
-        repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get("repo_name") else d_record.get(
-            "repo_id")
-        d_val["repo_name"] = repo_name
-        d_val["repo_id"] = repo_id
+        org_repo_name = get_first_match_or_none(r'(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*', link_text)
+        org_repo_name = str(org_repo_name)
+        if org_repo_name:
+            objnt_prop_dict = {}
+            if org_repo_name.startswith('orgs'):
+                org_login = org_repo_name.split('/')[-1]
+                repo_name = None
+            else:
+                org_login = None
+                repo_name = org_repo_name
+            if org_login:
+                if org_login == d_record.get("org_login"):
+                    org_id = d_record.get("org_id")
+                elif org_login == d_record.get("actor_login"):
+                    org_id = d_record.get("actor_id")
+                else:
+                    org_id = get_actor_id_by_actor_login(org_login)
+                objnt_prop_dict["org_login"] = org_login
+                objnt_prop_dict["org_id"] = org_id
+            if repo_name:
+                repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get("repo_name") else d_record.get(
+                    "repo_id")
+                d_val["repo_name"] = repo_name
+                d_val["repo_id"] = repo_id
+                objnt_prop_dict["repo_name"] = repo_name
+                objnt_prop_dict["repo_id"] = repo_id
+
+            d_val["objnt_prop_dict"] = objnt_prop_dict
     elif link_pattern_type == "GitHub_Other_Service":
         nt = "Obj"
     elif link_pattern_type == "GitHub_Service_External_Links":
