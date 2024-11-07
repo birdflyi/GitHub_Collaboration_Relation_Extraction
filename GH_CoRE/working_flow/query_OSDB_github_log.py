@@ -7,25 +7,11 @@
 # @File   : query_OSDB_github_log.py
 
 import os
-import sys
-
-if '__file__' not in globals():
-    # !pip install ipynbname  # Remove comment symbols to solve the ModuleNotFoundError
-    import ipynbname
-
-    nb_path = ipynbname.path()
-    __file__ = str(nb_path)
-cur_dir = os.path.dirname(__file__)
-pkg_rootdir = os.path.dirname(cur_dir)  # os.path.dirname()向上一级，注意要对应工程root路径
-if pkg_rootdir not in sys.path:  # 解决ipynb引用上层路径中的模块时的ModuleNotFoundError问题
-    sys.path.append(pkg_rootdir)
-    print('-- Add root directory "{}" to system path.'.format(pkg_rootdir))
 
 import pandas as pd
 
-from etc import filePathConf
-from script import columns_simple
-from utils.conndb import ConnDB
+from GH_CoRE.data_dict_settings import columns_simple
+from GH_CoRE.utils.conndb import ConnDB
 
 
 def get_repo_name_fileformat(repo_name: str):
@@ -79,6 +65,8 @@ def query_repo_log_each_year_to_csv_dir(repo_names, columns, save_dir, sql_param
 
 
 if __name__ == '__main__':
+    from etc import filePathConf
+
     # 1. 按repo_name分散存储到每一个csv文件中
     UPDATE_EXIST_DATA = False  # UPDATE SAVED RESULTS FLAG
 

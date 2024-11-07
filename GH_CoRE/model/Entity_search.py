@@ -9,11 +9,11 @@
 import re
 from urllib.parse import quote
 
-from script import re_ref_patterns
-from script.model.Attribute_getter import get_repo_id_by_repo_full_name, _get_field_from_db, \
+from GH_CoRE.data_dict_settings import re_ref_patterns
+from GH_CoRE.model.Attribute_getter import get_repo_id_by_repo_full_name, _get_field_from_db, \
     get_actor_id_by_actor_login, __get_github_userinfo_from_email, get_repo_name_by_repo_id, __get_issue_type
-from script.model.Entity_model import ObjEntity
-from utils.request_api import GitHubGraphQLAPI, RequestGitHubAPI
+from GH_CoRE.model.Entity_model import ObjEntity
+from GH_CoRE.utils.request_api import GitHubGraphQLAPI, RequestGitHubAPI
 
 d_link_pattern_type_nt = {
     "Issue_PR": ["Issue", "PullRequest", "IssueComment", "PullRequestReview", "PullRequestReviewComment", "Obj"],

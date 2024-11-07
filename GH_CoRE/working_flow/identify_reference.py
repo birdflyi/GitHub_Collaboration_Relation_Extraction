@@ -5,20 +5,6 @@
 # @Time   : 2023/5/21 15:28
 # @Author : 'Lou Zehua'
 # @File   : identify_reference.py
-import os
-import sys
-
-if '__file__' not in globals():
-    # !pip install ipynbname  # Remove comment symbols to solve the ModuleNotFoundError
-    import ipynbname
-
-    nb_path = ipynbname.path()
-    __file__ = str(nb_path)
-cur_dir = os.path.dirname(__file__)
-pkg_rootdir = os.path.dirname(cur_dir)  # os.path.dirname()向上一级，注意要对应工程root路径
-if pkg_rootdir not in sys.path:  # 解决ipynb引用上层路径中的模块时的ModuleNotFoundError问题
-    sys.path.append(pkg_rootdir)
-    print('-- Add root directory "{}" to system path.'.format(pkg_rootdir))
 
 import pickle
 import re
@@ -29,11 +15,10 @@ import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 
-from etc import filePathConf
-from script import event_columns_dict, body_columns_dict, re_ref_patterns, default_use_data_conf, USE_RAW_STR, \
+from GH_CoRE.data_dict_settings import event_columns_dict, body_columns_dict, re_ref_patterns, default_use_data_conf, USE_RAW_STR, \
     USE_REG_SUB_STRS, USE_REG_SUB_STRS_LEN, use_data_confs
-from script.body_content_preprocessing import read_csvs
-from script.df_sum_series_values import sum_series_values_ommit_nan
+from GH_CoRE.working_flow.body_content_preprocessing import read_csvs
+from GH_CoRE.working_flow.df_sum_series_values import sum_series_values_ommit_nan
 
 
 def drop_allNA(df, subset, how='all', use_columns=None):
@@ -362,6 +347,9 @@ def load_pickle(load_path):
 
 
 if __name__ == '__main__':
+    import os
+    from etc import filePathConf
+
     # 读入csv，筛选项目
     dbms_repos_dedup_content_dir = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR], 'repos_dedup_content')
     df_dbms_repos_dict = read_csvs(dbms_repos_dedup_content_dir, index_col=0)

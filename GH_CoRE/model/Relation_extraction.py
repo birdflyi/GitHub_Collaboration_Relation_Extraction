@@ -11,14 +11,14 @@ import os
 
 import pandas as pd
 
-from script.model.Attribute_getter import _get_field_from_db
-from script.model.ER_config_parser import eventType_params2repr, match_substr__from_body, df_ref_tuples_raw, \
+from GH_CoRE.model.Attribute_getter import _get_field_from_db
+from GH_CoRE.model.ER_config_parser import eventType_params2repr, match_substr__from_body, df_ref_tuples_raw, \
     eventType_params
-from script.model.Entity_model import ObjEntity
-from script.model.Entity_recognition import get_df_bodyRegLinks_eachLinkPatType
-from script.model.Entity_search import get_ent_obj_in_link_text
-from script.model.Event_model import Event
-from script.model.Relation_model import Relation, get_relation_label_repr
+from GH_CoRE.model.Entity_model import ObjEntity
+from GH_CoRE.model.Entity_recognition import get_df_bodyRegLinks_eachLinkPatType
+from GH_CoRE.model.Entity_search import get_ent_obj_in_link_text
+from GH_CoRE.model.Event_model import Event
+from GH_CoRE.model.Relation_model import Relation, get_relation_label_repr
 
 
 def get_df_and_dict_format_record(record):
@@ -201,7 +201,7 @@ def save_GitHub_Collaboration_Network(df_collaboration, save_path, add_mode_if_e
 
 if __name__ == '__main__':
     from etc import filePathConf
-    from script.model import df_tst
+    from GH_CoRE.model.tst_case import df_tst
 
     print(get_obj_collaboration_tuples_from_record(df_tst.to_dict("records")[1]))
 

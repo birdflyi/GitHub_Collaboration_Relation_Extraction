@@ -11,10 +11,9 @@ import os
 
 import pandas as pd
 
-from etc.filePathConf import BASE_DIR
-from utils.conndb import ConnDB
-from utils.prepare_sql import get_params_condition, format_sql
-from utils.request_api import RequestGitHubAPI, GitHubGraphQLAPI
+from GH_CoRE.utils.conndb import ConnDB
+from GH_CoRE.utils.prepare_sql import get_params_condition, format_sql
+from GH_CoRE.utils.request_api import RequestGitHubAPI, GitHubGraphQLAPI
 
 USE_LOC_ACTOR_REPO_TABLE = False
 UPDATE_LOC_ACTOR_REPO_TABLE = False
@@ -25,8 +24,8 @@ def prepare_loc_actor_repo_table():
     df_Actor = pd.DataFrame()
     df_Repo = pd.DataFrame()
     if USE_LOC_ACTOR_REPO_TABLE:
-        path_Actor = os.path.join(BASE_DIR, "data/global_data/Actor.csv")
-        path_Repo = os.path.join(BASE_DIR, "data/global_data/Repo.csv")
+        path_Actor = "data/global_data/Actor.csv"
+        path_Repo = "data/global_data/Repo.csv"
         conndb = ConnDB()
         if UPDATE_LOC_ACTOR_REPO_TABLE or not os.path.exists(path_Actor):
             # 更新Actor.csv
@@ -344,7 +343,6 @@ def __get_tag_commit_sha(_tag_exid, repo_full_name=None):  # 示例：https://ap
         requestGitHubAPI = RequestGitHubAPI(url_pat_mode='id')
         url = requestGitHubAPI.get_url(url_type="repo", params=url_params)
         response = requestGitHubAPI.request(url)
-        data = None
         if response is not None:
             data = response.json()
             repo_full_name = data["full_name"]
@@ -386,10 +384,10 @@ def __get_tag_commit_sha_by_GraphQL_API(tag_name, owner, repo):
         **params)
     query_graphql_api = GitHubGraphQLAPI()
     response = query_graphql_api.request(QUERY)
-    data = response.json()
     try:
+        data = response.json()
         tag_commit_sha = data['data']['repository']['ref']['target']['oid']
-    except KeyError:
+    except BaseException as e:
         tag_commit_sha = None
     return tag_commit_sha
 

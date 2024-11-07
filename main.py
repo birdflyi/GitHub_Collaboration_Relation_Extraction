@@ -25,13 +25,13 @@ if pkg_rootdir not in sys.path:  # 解决ipynb引用上层路径中的模块时�
 import logging
 
 from etc import filePathConf
-from script import columns_simple, columns_full
-from script.body_content_preprocessing import read_csvs, dedup_content
-from script.model.Relation_extraction import get_obj_collaboration_tuples_from_record, get_df_collaboration, \
+from GH_CoRE.data_dict_settings import columns_simple
+from GH_CoRE.working_flow.body_content_preprocessing import read_csvs, dedup_content
+from GH_CoRE.model.Relation_extraction import get_obj_collaboration_tuples_from_record, get_df_collaboration, \
     save_GitHub_Collaboration_Network
-from script.query_OSDB_github_log import query_repo_log_each_year_to_csv_dir, get_repo_name_fileformat, \
+from GH_CoRE.working_flow.query_OSDB_github_log import query_repo_log_each_year_to_csv_dir, get_repo_name_fileformat, \
     get_repo_year_filename
-from utils.logUtils.loadLogConfig import setup_logging
+from GH_CoRE.utils.logUtils import setup_logging
 
 
 def process_body_content(raw_content_dir=None, processed_content_dir=None, dedup_content_overwrite=False):

@@ -266,7 +266,7 @@
 
 ### 2.4.2 关系抽取
 
-详见[ER_config.py](../script/model/ER_config.py).
+详见[ER_config.py](../GH_CoRE/model/ER_config.py).
 
 ### 2.4.3 事件抽取
 

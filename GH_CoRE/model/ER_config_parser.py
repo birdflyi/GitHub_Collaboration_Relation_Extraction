@@ -8,7 +8,7 @@
 
 import pandas as pd
 
-from script.model.ER_config import event_trigger_ERE_triples_dict
+from GH_CoRE.model.ER_config import event_trigger_ERE_triples_dict
 
 
 def truncate_list_to_tuple(args, length=2, default_val=None):
@@ -208,7 +208,7 @@ df_ref_tuples.columns = columns_df_ref_tuples
 
 if __name__ == '__main__':
     # from script.model.ER_config import event_trigger_ERE_triples_dict
-    from utils.prepare_sql import get_params_condition, format_sql
+    from GH_CoRE.utils.prepare_sql import get_params_condition, format_sql
 
     test_eventType_params_reprs = eventType_params2reprs([['IssueCommentEvent', {"action": "created", "_on_Issue_or_PullRequest(issue_id)": "Issue"}], ['IssueCommentEvent', {"action": "created", "_on_Issue_or_PullRequest(issue_id)": "PullRequest"}], ['a_event', {"action": "test"}]], False)
     print(test_eventType_params_reprs)

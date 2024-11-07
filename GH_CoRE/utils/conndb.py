@@ -86,7 +86,12 @@ class AuthConfig:
 
 
 class ConnDB:
-    auth_settings_dict = AuthConfig.default_auth_settings_dict
+    try:
+        from etc.authConf import AuthConfig as LocAuthConfig
+        auth_config = LocAuthConfig()
+    except:
+        auth_config = AuthConfig()
+    auth_settings_dict = auth_config.default_auth_settings_dict
     sql = None
     df_format = True
     rs = None
@@ -94,7 +99,7 @@ class ConnDB:
     auto_update_columns = True
     client = None
     show_time_cost = False
-    intmed_mode = AuthConfig.DEFAULT_INTMED_MODE
+    intmed_mode = auth_config.DEFAULT_INTMED_MODE
 
     def __init__(self, sql: str | None = None, intmed_mode: int | None = None, auto_update_columns: bool | None = None):
         self.sql = sql
@@ -104,42 +109,42 @@ class ConnDB:
             self.auth_settings_dict = ConnDB.auth_settings_dict
         else:
             self.intmed_mode = intmed_mode
-            self.auth_settings_dict = AuthConfig.auth_settings_dicts[intmed_mode]
+            self.auth_settings_dict = self.auth_config.auth_settings_dicts[intmed_mode]
 
-        if self.intmed_mode == AuthConfig.I_AUTH_SETTINGS_ALIYUN_INTERMEDIATE_HOSTS:
-            self.SERVER_IP_INTMED_1 = self.auth_settings_dict[AuthConfig.SERVER_IP_INTMED_1]
-            self.SERVER_PORT_INTMED_1 = self.auth_settings_dict[AuthConfig.SERVER_PORT_INTMED_1]
-            self.USERNAME_INTMED_1 = self.auth_settings_dict[AuthConfig.USERNAME_INTMED_1]
-            self.PASSWORD_INTMED_1 = self.auth_settings_dict[AuthConfig.PASSWORD_INTMED_1]
-        if self.intmed_mode in [AuthConfig.I_AUTH_SETTINGS_ALIYUN_HOSTS, AuthConfig.I_AUTH_SETTINGS_ALIYUN_INTERMEDIATE_HOSTS]:
-            self.SERVER_IP_TARGET = self.auth_settings_dict.get(AuthConfig.SERVER_IP_TARGET)
-            self.SERVER_PORT_TARGET = self.auth_settings_dict.get(AuthConfig.SERVER_PORT_TARGET)
-        if self.intmed_mode in [AuthConfig.I_AUTH_SETTINGS_LOCAL_HOSTS, AuthConfig.I_AUTH_SETTINGS_ALIYUN_INTERMEDIATE_HOSTS]:
-            self.SERVER_IP_LOCALHOST = self.auth_settings_dict.get(AuthConfig.SERVER_IP_LOCALHOST)
-            self.SERVER_PORT_LOCALHOST = self.auth_settings_dict.get(AuthConfig.SERVER_PORT_LOCALHOST)
+        if self.intmed_mode == self.auth_config.I_AUTH_SETTINGS_ALIYUN_INTERMEDIATE_HOSTS:
+            self.SERVER_IP_INTMED_1 = self.auth_settings_dict[self.auth_config.SERVER_IP_INTMED_1]
+            self.SERVER_PORT_INTMED_1 = self.auth_settings_dict[self.auth_config.SERVER_PORT_INTMED_1]
+            self.USERNAME_INTMED_1 = self.auth_settings_dict[self.auth_config.USERNAME_INTMED_1]
+            self.PASSWORD_INTMED_1 = self.auth_settings_dict[self.auth_config.PASSWORD_INTMED_1]
+        if self.intmed_mode in [self.auth_config.I_AUTH_SETTINGS_ALIYUN_HOSTS, self.auth_config.I_AUTH_SETTINGS_ALIYUN_INTERMEDIATE_HOSTS]:
+            self.SERVER_IP_TARGET = self.auth_settings_dict.get(self.auth_config.SERVER_IP_TARGET)
+            self.SERVER_PORT_TARGET = self.auth_settings_dict.get(self.auth_config.SERVER_PORT_TARGET)
+        if self.intmed_mode in [self.auth_config.I_AUTH_SETTINGS_LOCAL_HOSTS, self.auth_config.I_AUTH_SETTINGS_ALIYUN_INTERMEDIATE_HOSTS]:
+            self.SERVER_IP_LOCALHOST = self.auth_settings_dict.get(self.auth_config.SERVER_IP_LOCALHOST)
+            self.SERVER_PORT_LOCALHOST = self.auth_settings_dict.get(self.auth_config.SERVER_PORT_LOCALHOST)
 
-        self.DBMS_USERNAME = self.auth_settings_dict[AuthConfig.DBMS_USERNAME]
-        self.DBMS_PASSWORD = self.auth_settings_dict[AuthConfig.DBMS_PASSWORD]
-        self.USE_DATABASE = self.auth_settings_dict[AuthConfig.USE_DATABASE]
+        self.DBMS_USERNAME = self.auth_settings_dict[self.auth_config.DBMS_USERNAME]
+        self.DBMS_PASSWORD = self.auth_settings_dict[self.auth_config.DBMS_PASSWORD]
+        self.USE_DATABASE = self.auth_settings_dict[self.auth_config.USE_DATABASE]
 
         if auto_update_columns is not None:
             self.auto_update_columns = auto_update_columns
 
     def query(self, *args, **kwargs):
         try:
-            if self.intmed_mode == AuthConfig.I_AUTH_SETTINGS_LOCAL_HOSTS:
+            if self.intmed_mode == self.auth_config.I_AUTH_SETTINGS_LOCAL_HOSTS:
                 self.client = Client(host=self.SERVER_IP_LOCALHOST, port=self.SERVER_PORT_LOCALHOST,
                                      user=self.DBMS_USERNAME,
                                      password=self.DBMS_PASSWORD,
                                      database=self.USE_DATABASE,
                                      send_receive_timeout=600)
-            elif self.intmed_mode == AuthConfig.I_AUTH_SETTINGS_ALIYUN_HOSTS:
+            elif self.intmed_mode == self.auth_config.I_AUTH_SETTINGS_ALIYUN_HOSTS:
                 self.client = Client(host=self.SERVER_IP_TARGET, port=self.SERVER_PORT_TARGET,
                                      user=self.DBMS_USERNAME,
                                      password=self.DBMS_PASSWORD,
                                      database=self.USE_DATABASE,
                                      send_receive_timeout=600)
-            elif self.intmed_mode == AuthConfig.I_AUTH_SETTINGS_ALIYUN_INTERMEDIATE_HOSTS:
+            elif self.intmed_mode == self.auth_config.I_AUTH_SETTINGS_ALIYUN_INTERMEDIATE_HOSTS:
                 with SSHTunnelForwarder(
                         (self.SERVER_IP_INTMED_1, self.SERVER_PORT_INTMED_1),
                         ssh_username=self.USERNAME_INTMED_1,
@@ -152,7 +157,7 @@ class ConnDB:
                                          database=self.USE_DATABASE,
                                          send_receive_timeout=600)
             else:
-                raise ValueError(f"The intmed_mode is expected in {list(AuthConfig.auth_settings_dicts.keys())}! "
+                raise ValueError(f"The intmed_mode is expected in {list(self.auth_config.auth_settings_dicts.keys())}! "
                                  f"Got intmed_mode={self.intmed_mode}!")
             self.rs = self.client.query_dataframe(*args, **kwargs)
             if self.auto_update_columns:
@@ -207,7 +212,7 @@ if __name__ == '__main__':
 
     import os
 
-    from utils import pkg_rootdir
+    from GH_CoRE.utils import pkg_rootdir
 
     # regenerate data_description.csv
     use_database = "opensource"

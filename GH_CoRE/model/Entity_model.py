@@ -13,9 +13,9 @@ import types
 import numpy as np
 
 # __get_tag_commit_sha must be imported, see ER_config.event_trigger_ERE_triples_dict
-from script.model.Attribute_getter import _get_field_from_db, get_actor_id_by_actor_login, \
+from GH_CoRE.model.Attribute_getter import _get_field_from_db, get_actor_id_by_actor_login, \
     get_repo_id_by_repo_full_name, __get_commit_parents_sha, __get_tag_commit_sha
-from script.model.ER_config_parser import get_eventType_params_from_joined_str
+from GH_CoRE.model.ER_config_parser import get_eventType_params_from_joined_str
 
 
 class Obj_exid:
@@ -458,7 +458,7 @@ class ObjEntity(object):
 
 
 if __name__ == '__main__':
-    from script.model import df_tst
+    from GH_CoRE.model.tst_case import df_tst
 
     tag_exid = Obj_exid.get_exid('_release_tag_exid', {"repo_id": 123456, "tag_name": "v1.2.3"})
     print(tag_exid)

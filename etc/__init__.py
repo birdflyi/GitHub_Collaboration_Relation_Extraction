@@ -4,7 +4,7 @@
 
 # @Time   : 2023/4/19 21:16
 # @Author : 'Lou Zehua'
-# @File   : __init__.py.py 
+# @File   : __init__.py
 
 import os
 import sys

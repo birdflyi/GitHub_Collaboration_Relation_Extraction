@@ -8,8 +8,8 @@
 
 import pandas as pd
 
-from script import re_ref_patterns
-from script.identify_reference import get_df_local_msg_regexed_dict, regex_df
+from GH_CoRE.data_dict_settings import re_ref_patterns
+from GH_CoRE.working_flow.identify_reference import get_df_local_msg_regexed_dict, regex_df
 
 
 def merge_links_in_records(record, use_msg_columns):
@@ -37,7 +37,7 @@ def get_df_bodyRegLinks_eachLinkPatType(df_local_msg, use_msg_columns=None):
 
 
 if __name__ == '__main__':
-    from script.model import df_tst
+    from GH_CoRE.model.tst_case import df_tst
 
     df_regexed = regex_df(df_tst.loc[1].to_frame().T[['id', 'body']], ['body'], re_ref_patterns["Issue_PR"][4], use_data_conf=1)
     print(df_regexed)

@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 # Python 3.9
 
-# @Time   : 2024/10/21 14:18
+# @Time   : 2024/11/8 2:59
 # @Author : 'Lou Zehua'
-# @File   : __init__.py.py 
+# @File   : tst_case.py 
 
 import pandas as pd
 
 from pandas import Timestamp
+
 
 df_tst = pd.DataFrame([
     {'issue_number': 13432,

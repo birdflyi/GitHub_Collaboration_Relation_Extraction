@@ -10,7 +10,7 @@ import re
 
 import pandas as pd
 
-from script.model.ER_config_parser import df_ref_tuples_raw, df_ref_tuples, event_trim_subType
+from GH_CoRE.model.ER_config_parser import df_ref_tuples_raw, df_ref_tuples, event_trim_subType
 
 
 def get_relation_label_repr(rec):

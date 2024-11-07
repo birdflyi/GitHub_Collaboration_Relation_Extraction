@@ -100,7 +100,13 @@ class RequestAPI:
 class GitHubTokenPool:
 
     def __init__(self, github_tokens=None):
-        self.github_tokens = github_tokens or GITHUB_TOKENS
+        self.github_tokens = github_tokens
+        if self.github_tokens is None:
+            try:
+                from etc.authConf import GITHUB_TOKENS as LOC_GITHUB_TOKENS
+                self.github_tokens = LOC_GITHUB_TOKENS
+            except:
+                self.github_tokens = GITHUB_TOKENS
         self.tokenState_list = self.init_tokenState_list()
         self.minTime_tokenState = {"token": '', "remaining": 0, "reset": float(time.time())}
 

@@ -6,8 +6,8 @@
 # @Author : 'Lou Zehua'
 # @File   : Event_model.py
 
-from script.model.Attribute_getter import _get_field_from_db
-from script.model.ER_config_parser import get_eventType_params_from_joined_str, eventType_params2reprs, \
+from GH_CoRE.model.Attribute_getter import _get_field_from_db
+from GH_CoRE.model.ER_config_parser import get_eventType_params_from_joined_str, eventType_params2reprs, \
     eventType_params
 
 
