@@ -4,7 +4,8 @@
 
 # @Time   : 2024/11/7 8:02
 # @Author : 'Lou Zehua'
-# @File   : setup.py 
+# @File   : setup.py
+import re
 
 import GH_CoRE
 
@@ -14,8 +15,16 @@ from pkg_resources import parse_requirements
 with open("./requirements.txt", encoding="utf-8") as fp:
     install_requires = [str(requirement) for requirement in parse_requirements(fp)]
 
-setup(name=GH_CoRE.__name__,
-      version=GH_CoRE.__version__,
+with open("./pyproject.toml", encoding="utf-8") as fp:
+    content = fp.read()
+    names = re.findall(r'(?<=\nname = ")[A-Za-z0-9][-_0-9a-zA-Z\.]*', content)
+    versions = re.findall(r'(?<=\nversion = ")\d[-_0-9a-zA-Z\.]*', content)
+
+name = names[0] if names else GH_CoRE.__name__
+version = versions[0] if versions else GH_CoRE.__version__
+
+setup(name=name,
+      version=version,
       description='GitHub Collaboration Relation Extraction',
       url='https://github.com/birdflyi/GitHub_Collaboration_Relation_Extraction',
       license="Apache License 2.0",
@@ -36,5 +45,4 @@ setup(name=GH_CoRE.__name__,
       ],
       packages=find_packages(exclude=["etc"]),
       install_requires=install_requires,
-      python_requires='>=3.6',
       )

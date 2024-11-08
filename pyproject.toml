@@ -3,15 +3,31 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
+name = "GH_CoRE"
+version = "1.1.2"
+requires-python = ">=3.6"
 authors = [
   {name = "birdflyi", email = "zhlou@stu.ecnu.edu.cn"},
 ]
+description = "GitHub Collaboration Relation Extraction"
 readme = "README.md"
 license = {file = "LICENSE"}
 keywords = ["Relation Extraction", "GitHub event", "dataset"]
+classifiers = [
+      # Development Status, see https://pypi.org/classifiers/
+      #   3 - Alpha
+      #   4 - Beta
+      #   5 - Production/Stable
+      'Development Status :: 3 - Alpha',
+      'Intended Audience :: Developers',
+      'Intended Audience :: Science/Research',
+      'License :: OSI Approved :: Apache Software License',
+      'Operating System :: OS Independent',
+      'Programming Language :: Python :: 3',
+      'Programming Language :: Python :: Implementation :: PyPy',
+      'Topic :: Scientific/Engineering :: Information Analysis',
+]
 
-[tool.setuptools.packages.find]
-exclude = ['venv*']
-
-[tool.setuptools]
-include-package-data = true
+[project.urls]
+Homepage = "https://github.com/birdflyi/GitHub_Collaboration_Relation_Extraction"
+Repository = "https://github.com/birdflyi/GitHub_Collaboration_Relation_Extraction.git"
