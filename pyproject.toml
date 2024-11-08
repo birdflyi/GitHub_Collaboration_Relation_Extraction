@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+authors = [
+  {name = "birdflyi", email = "zhlou@stu.ecnu.edu.cn"},
+]
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["Relation Extraction", "GitHub event", "dataset"]
+
+[tool.setuptools.packages.find]
+exclude = ['venv*']
+
+[tool.setuptools]
+include-package-data = true
