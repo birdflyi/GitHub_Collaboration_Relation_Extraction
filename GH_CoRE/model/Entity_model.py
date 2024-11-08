@@ -320,7 +320,7 @@ class ObjEntity(object):
 
     def __init__(self, entity_type: str, init_mode='build_id', U_init_scope: list = None):
         self.__type__raw = entity_type
-        self.__type__ = entity_type.split(ObjEntity.nt_label_delimiter)[0]
+        self.__type__ = entity_type.split(ObjEntity.nt_label_delimiter)[0] if isinstance(entity_type, str) else None
         if init_mode not in ['build_id', 'query_other_fileds_in_F_by_id', 'build_all_fields']:
             raise ValueError("init_mode must be in ['build_id', 'query_other_fileds_in_F_by_id', 'build_all_fields']!")
         self._init_mode = init_mode

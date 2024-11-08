@@ -494,7 +494,6 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                         else:
                             label = "GitHub_Dir"
                         objnt_prop_dict = {"label": label}
-
             else:
                 nt = "Obj"  # repo_id repo_name仍保留
                 objnt_prop_dict = None
@@ -606,6 +605,11 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
         if d_extra_prop:
             objnt_prop_dict.update(d_extra_prop)
     d_val["objnt_prop_dict"] = objnt_prop_dict
+    if not isinstance(nt, str):
+        print(f"The node type is {nt}! It will be parsed into {default_node_type} by default! You may need to check "
+              f"if you have overlooked handling certain boundary situations!"
+              f"\r\n\tCurrent d_val = {d_val}.")
+        nt = default_node_type
     ent_obj = ObjEntity(nt)
     ent_obj.set_val(d_val)
     return ent_obj
