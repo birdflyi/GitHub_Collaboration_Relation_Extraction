@@ -7,7 +7,9 @@
 # @File   : Entity_search.py
 
 import re
-from urllib.parse import quote
+from urllib.parse import quote, unquote
+
+import pandas as pd
 
 from GH_CoRE.data_dict_settings import re_ref_patterns
 from GH_CoRE.model.Attribute_getter import get_repo_id_by_repo_full_name, _get_field_from_db, \
@@ -30,12 +32,25 @@ d_link_pattern_type_nt = {
     "GitHub_Service_External_Links": ["Obj"],
 }
 
+URL_ESCAPE_CHARS = "_-.'/()!"
+
+
+def escape_double_quote_marks(s, auto=True):
+    if auto and "\"" not in s:
+        s_esc_quote = s
+    else:
+        try:
+            s_esc_quote = s.replace("\\", r"\\").replace("\"", r"\"")
+        except BaseException:
+            s_esc_quote = s
+    return s_esc_quote
+
 
 def get_nt_list_by_link_pattern_type(link_pattern_type):
     return d_link_pattern_type_nt[link_pattern_type]
 
 
-def encode_urls(path_list, safe="_-.'/()!"):
+def encode_urls(path_list, safe=URL_ESCAPE_CHARS):
     return [quote(path, safe=safe) for path in path_list]
 
 
@@ -56,6 +71,59 @@ def get_issue_type_by_repo_id_issue_number(repo_id, issue_number):
     return node_type
 
 
+def __get_ref_name_exists_flag_by_repo_name(ref_name, repo_name, query_node_type='tag'):
+    ref_name = escape_double_quote_marks(ref_name)
+    query_node_types = ['branch', 'tag']
+    if query_node_type not in query_node_types:
+        raise ValueError(f"query_node_type must be in {query_node_types}!")
+    # GraphQL查询语句
+    query_branch_by_name = """
+    query {
+      repository(owner: "%s", name: "%s") {
+        ref(qualifiedName: "refs/heads/%s") { 
+          target {
+            ... on Node {
+              id
+            }
+          }
+        }
+      }
+    }
+    """ % (repo_name.split('/')[0], repo_name.split('/')[1], ref_name)
+
+    query_tag_by_name = """
+    query {
+      repository(owner: "%s", name: "%s") {
+        ref(qualifiedName: "refs/tags/%s") {
+          target {
+            ... on Node {
+              id
+            }
+          }
+        }
+      }
+    }
+    """ % (repo_name.split('/')[0], repo_name.split('/')[1], ref_name)  # (r"v'\"-./()<>!@%40", "birdflyi/test", query_node_type='tag')
+
+    d_query = {"query_node_types": query_node_types[:2],
+               "query_statements": [query_branch_by_name, query_tag_by_name],
+               "variables": [{}, {}]}
+    df_query = pd.DataFrame(d_query)
+    query = df_query[df_query["query_node_types"] == query_node_type]["query_statements"].values[0]
+    variables = df_query[df_query["query_node_types"] == query_node_type]["variables"].values[0]
+    query_graphql_api = GitHubGraphQLAPI()
+    response = query_graphql_api.request(query, params=variables)
+    data = response.json()
+    get_ref_dict = lambda data: data["data"]["repository"]["ref"]
+    try:
+        ref_dict = get_ref_dict(data)
+        ref_id = ref_dict["target"]["id"]
+    except BaseException:
+        ref_id = None
+    ref_name_exists_flag = ref_id is not None
+    return ref_name_exists_flag
+
+
 def __get_ref_names_by_repo_name(repo_name, query_node_type='tag'):
     query_node_types = ['branch', 'tag']
     if query_node_type not in query_node_types:
@@ -63,21 +131,29 @@ def __get_ref_names_by_repo_name(repo_name, query_node_type='tag'):
 
     # GraphQL查询语句
     query_branches = """
-    {
+    query ($after: String) {
       repository(owner: "%s", name: "%s") {
-        refs(refPrefix: "refs/heads/", first: 100) {
-          nodes {
-            name
+        refs(refPrefix: "refs/heads/", first: 100, after: $after) {
+          edges {
+            node {
+              name
+            }
+            cursor
+          }
+          pageInfo {
+            endCursor
+            hasNextPage
           }
         }
       }
     }
     """ % (repo_name.split('/')[0], repo_name.split('/')[1])
+    variables_branches = {"after": None}
 
     query_tags = """
-    {
+    query ($after: String) {
       repository(owner: "%s", name: "%s") {
-        refs(refPrefix: "refs/tags/", first: 100) {
+        refs(refPrefix: "refs/tags/", first: 100, after: $after) {
           edges {
             node {
               name
@@ -90,23 +166,40 @@ def __get_ref_names_by_repo_name(repo_name, query_node_type='tag'):
                 }
               }
             }
+            cursor
+          }
+          pageInfo {
+            endCursor
+            hasNextPage
           }
         }
       }
     }
     """ % (repo_name.split('/')[0], repo_name.split('/')[1])
+    variables_tags = {"after": None}
 
-    d_query = dict(zip(query_node_types[:2], [query_branches, query_tags]))
-    query = d_query[query_node_type]
+    d_query = {"query_node_types": query_node_types[:2],
+               "query_statements": [query_branches, query_tags],
+               "variables": [variables_branches, variables_tags]}
+    df_query = pd.DataFrame(d_query)
+    query = df_query[df_query["query_node_types"] == query_node_type]["query_statements"].values[0]
+    variables = df_query[df_query["query_node_types"] == query_node_type]["variables"].values[0]
+    variables = {} if variables is None else dict(variables)
     query_graphql_api = GitHubGraphQLAPI()
-    response = query_graphql_api.request(query)
+    response = query_graphql_api.request(query, variables=variables)
     data = response.json()
-    parse_branches = lambda data: [branch['name'] for branch in data['data']['repository']['refs']['nodes']]
-    parse_tags = lambda data: [e['node']['name'] for e in data['data']['repository']['refs']['edges']]
-    # print(data)
-    d_parse_func = dict(zip(query_node_types[:2], [parse_branches, parse_tags]))
+    get_ref_names = lambda data: [edge["node"]["name"] for edge in data["data"]["repository"]["refs"]["edges"]]
+    get_page_info = lambda data: data["data"]["repository"]["refs"]["pageInfo"]
     try:
-        name_list = d_parse_func[query_node_type](data)
+        name_list = get_ref_names(data)
+        page_info = get_page_info(data)
+        while page_info["hasNextPage"]:
+            variables.update(**{"after": page_info["endCursor"]})
+            response_cur_page = query_graphql_api.request(query, variables=variables)
+            data_cur_page = response_cur_page.json()
+            name_list_cur_page = get_ref_names(data_cur_page)
+            name_list.extend(name_list_cur_page)
+            page_info = get_page_info(data_cur_page)
     except BaseException:
         name_list = []
     return name_list
@@ -412,7 +505,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
     elif link_pattern_type == "Actor":
         if re.findall(r"github(?:-redirect.dependabot)?.com/", link_text):
             nt = "Actor"
-            actor_login = get_first_match_or_none(r"(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*(?![-A-Za-z0-9/])", link_text)
+            actor_login = get_first_match_or_none(r"(?<=com/)([A-Za-z0-9][-0-9a-zA-Z]*(?:\[bot\])?)(?![-A-Za-z0-9/])", link_text)
             actor_id = get_actor_id_by_actor_login(actor_login) if actor_login != d_record.get(
                 "actor_login") else d_record.get("actor_id")
             objnt_prop_dict = {"actor_id": actor_id, "actor_login": actor_login}
@@ -421,7 +514,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
             d_val["objnt_prop_dict"] = objnt_prop_dict
         elif '@' in link_text:  # @actor_login @normal_text
             if link_text.startswith('@'):
-                actor_login = link_text.split('@')[-1]
+                actor_login = link_text.split('@', 1)[-1]
                 actor_id = get_actor_id_by_actor_login(actor_login) if actor_login != d_record.get(
                     "actor_login") else d_record.get("actor_id")
             else:  # e.g. email
@@ -448,22 +541,43 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
     elif link_pattern_type == "Repo":
         if re.findall(r"github(?:-redirect.dependabot)?.com/", link_text):
             nt = "Repo"
-            repo_name = get_first_match_or_none(
+            repo_name_pattern_substr = get_first_match_or_none(
                 r'(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*(?![-_A-Za-z0-9\./])', link_text)
-            if repo_name.endswith(".git"):
-                repo_name = repo_name[:-4]
-            elif repo_name.endswith("."):
-                repo_name = repo_name[:-1]
-            repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
-                "repo_name") else d_record.get("repo_id")
-            if repo_id:
-                objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name}
+            if str(repo_name_pattern_substr).startswith("orgs/"):
+                actor_login = repo_name_pattern_substr.split('orgs/', 1)[-1]
+                nt = default_node_type
+                if actor_login:
+                    if actor_login == d_record.get("org_login"):
+                        actor_id = d_record.get("org_id")
+                    elif actor_login == d_record.get("actor_login"):
+                        actor_id = d_record.get("actor_id")
+                    else:
+                        actor_id = get_actor_id_by_actor_login(actor_login)
+                    if actor_id:
+                        nt = "Actor"
+                        objnt_prop_dict = objnt_prop_dict or {}
+                        objnt_prop_dict["label"] = "Organization"
+                        objnt_prop_dict["org_login"] = actor_login
+                        objnt_prop_dict["org_id"] = actor_id
+                        d_val["actor_login"] = actor_login
+                        d_val["actor_id"] = actor_id
+                        d_val["objnt_prop_dict"] = objnt_prop_dict
             else:
-                nt = "Obj"  # uncertain
-                objnt_prop_dict = None
-            d_val["repo_name"] = repo_name
-            d_val["repo_id"] = repo_id
-            d_val["objnt_prop_dict"] = objnt_prop_dict
+                repo_name = repo_name_pattern_substr
+                if repo_name.endswith(".git"):
+                    repo_name = repo_name[:-4]
+                elif repo_name.endswith("."):
+                    repo_name = repo_name[:-1]
+                repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
+                    "repo_name") else d_record.get("repo_id")
+                if repo_id:
+                    objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name}
+                else:
+                    nt = "Obj"  # uncertain
+                    objnt_prop_dict = None
+                d_val["repo_name"] = repo_name
+                d_val["repo_id"] = repo_id
+                d_val["objnt_prop_dict"] = objnt_prop_dict
         else:
             pass  # should never be reached
     elif link_pattern_type == "Branch_Tag_GHDir":
@@ -475,25 +589,33 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
 
             Branch_Tag_GHDir_name = get_first_match_or_none(r'(?<=tree/)[^\s#]+$', link_text)
             if Branch_Tag_GHDir_name:
-                response_branch_names = __get_ref_names_by_repo_name(repo_name, query_node_type="branch")
-                if Branch_Tag_GHDir_name in response_branch_names or Branch_Tag_GHDir_name in encode_urls(response_branch_names):
+                Branch_Tag_GHDir_name = str(Branch_Tag_GHDir_name)
+                Branch_Tag_GHDir_name_url_dec = unquote(Branch_Tag_GHDir_name)
+                branch_ref_name_exists = __get_ref_name_exists_flag_by_repo_name(Branch_Tag_GHDir_name, repo_name, query_node_type="branch")
+                branch_ref_name_dec_exists = __get_ref_name_exists_flag_by_repo_name(Branch_Tag_GHDir_name_url_dec, repo_name, query_node_type="branch")
+                if branch_ref_name_exists or branch_ref_name_dec_exists:
                     nt = "Branch"
                     d_val["branch_name"] = Branch_Tag_GHDir_name
                     objnt_prop_dict = {"branch_name": Branch_Tag_GHDir_name}
                 else:
-                    responce_tag_names = __get_ref_names_by_repo_name(repo_name, query_node_type="tag")
-                    if not Branch_Tag_GHDir_name.__contains__("/") or Branch_Tag_GHDir_name in responce_tag_names or \
-                            Branch_Tag_GHDir_name in encode_urls(responce_tag_names):
+                    tag_ref_name_exists = __get_ref_name_exists_flag_by_repo_name(Branch_Tag_GHDir_name, repo_name, query_node_type="tag")
+                    tag_ref_name_dec_exists = __get_ref_name_exists_flag_by_repo_name(Branch_Tag_GHDir_name_url_dec, repo_name, query_node_type="tag")
+                    if tag_ref_name_exists or tag_ref_name_dec_exists:
+                        if Branch_Tag_GHDir_name_url_dec != Branch_Tag_GHDir_name and tag_ref_name_dec_exists:
+                            Branch_Tag_GHDir_name = Branch_Tag_GHDir_name_url_dec
                         nt = "Tag"
                         d_val["tag_name"] = Branch_Tag_GHDir_name
                         objnt_prop_dict = {"tag_name": Branch_Tag_GHDir_name}
                     else:
                         nt = "Obj"  # GitHub_Dir
-                        if str(Branch_Tag_GHDir_name).__contains__("#"):
+                        label = None
+                        objnt_prop_dict = {}
+                        if "#" in Branch_Tag_GHDir_name:
                             label = "Text_Locator"
-                        else:
+                        elif "/" in Branch_Tag_GHDir_name:
                             label = "GitHub_Dir"
-                        objnt_prop_dict = {"label": label}
+                        if label is not None:
+                            objnt_prop_dict["label"] = label
             else:
                 nt = "Obj"  # repo_id repo_name仍保留
                 objnt_prop_dict = None
@@ -534,20 +656,41 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
     elif link_pattern_type == "Release":
         if re.findall(r"/releases/tag/[^\s]+", link_text):
             nt = "Release"
+            tag_query_status = None
             repo_name = get_first_match_or_none(r'(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*',
                                                 link_text)
             repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                 "repo_name") else d_record.get("repo_id")
             release_tag_name = get_first_match_or_none(r'(?<=/releases/tag/)[^\s]+', link_text)
-            if release_tag_name == d_record.get("release_tag_name"):
+            release_tag_name_url_dec = unquote(release_tag_name)
+               
+            if release_tag_name == d_record.get("release_tag_name") or release_tag_name_url_dec == d_record.get("release_tag_name"):
+                if release_tag_name_url_dec == d_record.get("release_tag_name"):
+                    release_tag_name = release_tag_name_url_dec
                 release_id = d_record.get("release_id")
             else:
                 release_id = _get_field_from_db('release_id', {"repo_id": repo_id, "release_tag_name": release_tag_name})
-            if release_id:
+                if release_tag_name != release_tag_name_url_dec and not release_id:
+                    release_id = _get_field_from_db('release_id',
+                                                    {"repo_id": repo_id, "release_tag_name": release_tag_name_url_dec})
+                    if release_id:
+                        release_tag_name = release_tag_name_url_dec
+                if not release_id:  # This may be a tag, but not a release tag.
+                    nt = "Tag"
+                    tag_name = release_tag_name
+                    tag_query_status = "failure"
+                    tag_ref_name_exists = __get_ref_name_exists_flag_by_repo_name(release_tag_name, repo_name, query_node_type="tag")
+                    tag_ref_name_dec_exists = __get_ref_name_exists_flag_by_repo_name(release_tag_name_url_dec, repo_name, query_node_type="tag")
+                    if tag_ref_name_exists or tag_ref_name_dec_exists:
+                        tag_query_status = "success"
+                        if release_tag_name_url_dec != release_tag_name and tag_ref_name_dec_exists:
+                            tag_name = release_tag_name_url_dec
+                    release_id = None
+                    release_tag_name = None
+                    d_val["tag_name"] = tag_name
+                    objnt_prop_dict = {"tag_name": tag_name, "tag_query_status": tag_query_status}
+            if tag_query_status is None:
                 objnt_prop_dict = {"release_id": release_id, "release_tag_name": release_tag_name}
-            else:  # 也可能是查询的异常
-                objnt_prop_dict = {"release_tag_name": release_tag_name, "status": "QuickSearchFailed"}
-                release_tag_name = None
             d_val["repo_name"] = repo_name
             d_val["repo_id"] = repo_id
             d_val["release_id"] = release_id
@@ -568,21 +711,28 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
         org_repo_name = str(org_repo_name)
         if org_repo_name:
             objnt_prop_dict = {}
-            if org_repo_name.startswith('orgs'):
-                org_login = org_repo_name.split('/')[-1]
+            if org_repo_name.startswith('orgs/'):
+                actor_login = org_repo_name.split('orgs/', 1)[-1]
                 repo_name = None
             else:
-                org_login = None
+                actor_login = None
                 repo_name = org_repo_name
-            if org_login:
-                if org_login == d_record.get("org_login"):
-                    org_id = d_record.get("org_id")
-                elif org_login == d_record.get("actor_login"):
-                    org_id = d_record.get("actor_id")
+            if actor_login:
+                if actor_login == d_record.get("org_login"):
+                    actor_id = d_record.get("org_id")
+                elif actor_login == d_record.get("actor_login"):
+                    actor_id = d_record.get("actor_id")
                 else:
-                    org_id = get_actor_id_by_actor_login(org_login)
-                objnt_prop_dict["org_login"] = org_login
-                objnt_prop_dict["org_id"] = org_id
+                    actor_id = get_actor_id_by_actor_login(actor_login)
+                if actor_id:
+                    nt = "Actor"
+                    objnt_prop_dict = objnt_prop_dict or {}
+                    objnt_prop_dict["label"] = "Organization"
+                    objnt_prop_dict["org_login"] = actor_login
+                    objnt_prop_dict["org_id"] = actor_id
+                    d_val["actor_login"] = actor_login
+                    d_val["actor_id"] = actor_id
+                    d_val["objnt_prop_dict"] = objnt_prop_dict
             if repo_name:
                 repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get("repo_name") else d_record.get(
                     "repo_id")
@@ -594,6 +744,15 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
             d_val["objnt_prop_dict"] = objnt_prop_dict
     elif link_pattern_type == "GitHub_Other_Service":
         nt = "Obj"
+        actor_login = get_first_match_or_none(r"(?<=com/apps/)([A-Za-z0-9][-0-9a-zA-Z]*(?:\[bot\])?)(?![-A-Za-z0-9/])", link_text)
+        actor_id = get_actor_id_by_actor_login(actor_login) if actor_login != d_record.get(
+            "actor_login") else d_record.get("actor_id")
+        if actor_id:
+            nt = 'Actor'
+            objnt_prop_dict = {"actor_id": actor_id, "actor_login": actor_login, "label": "Bot"}
+            d_val["actor_login"] = actor_login
+            d_val["actor_id"] = actor_id
+            d_val["objnt_prop_dict"] = objnt_prop_dict
     elif link_pattern_type == "GitHub_Service_External_Links":
         nt = "Obj"
     else:
@@ -618,6 +777,10 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
 if __name__ == '__main__':
     print(get_issue_type_by_repo_id_issue_number(288431943, 1552))
     print(__get_ref_names_by_repo_name('birdflyi/test', query_node_type="branch"))
+    branch_name = "'\"-./()<>!@"
+    print(branch_name, __get_ref_name_exists_flag_by_repo_name(branch_name, 'birdflyi/test', query_node_type="branch"))
+    tag_name = "v'\"-./()<>!@%40"
+    print(tag_name, __get_ref_name_exists_flag_by_repo_name(tag_name, 'birdflyi/test', query_node_type="tag"))
 
     temp_link_text = """
     redis/redis#123
@@ -678,15 +841,33 @@ if __name__ == '__main__':
                                                           'https://sqlite.org/forum/forumpost/fdb0bb7ad0']
     }
 
-    link_text = '\n'.join([e_i for e in d_link_text.values() for e_i in e]) + temp_link_text
-    print(re.findall(re_ref_patterns["Issue_PR"][0], link_text))
+    # link_text = '\n'.join([e_i for e in d_link_text.values() for e_i in e]) + temp_link_text
+    # print(re.findall(re_ref_patterns["Issue_PR"][0], link_text))
+    link_text = """
+    @dnz
+    https://github.com/orgs/cockroachdb
+    https://github.com/orgs/cockroachdb/teams/storage
+    https://github.com/birdflyi/test/tree/'\"-./()<>!%40
+    https://github.com/cockroachdb/cockroach/releases/tag/%40cockroachlabs%2Fcluster-ui%4024.3.2
+    https://github.com/apps/exalate-issue-sync[bot]
+    @exalate-issue-sync[bot]
+    cockroachlabs/blathers-bot#92
+    Friendly ping on this one as well @andrewbaptis.
+    Friendly ping on this one as well @andrewbaptis.(edited)
+    """
+
+    from GH_CoRE.working_flow import mask_code
+
     results = []
     for link_pattern_type in re_ref_patterns.keys():
-        for link in re.findall(re_ref_patterns[link_pattern_type][4], link_text):
-            obj = get_ent_obj_in_link_text(link_pattern_type, link, d_record={'repo_name': 'X-lab2017/open-digger'})
-            results.append(obj)
-        break
-    print(results[0].__dict__)
+        for i in range(len(re_ref_patterns[link_pattern_type])):
+            for link in re.findall(re_ref_patterns[link_pattern_type][i], mask_code(link_text)):
+                obj = get_ent_obj_in_link_text(link_pattern_type, link, d_record={'repo_name': 'cockroachdb/cockroach', 'repo_id': 16563587})
+                results.append(obj)
+
+    for i, res in enumerate(results):
+        print(i, results[i].__type__, results[i].get_dict())
+
     obj = get_ent_obj_in_link_text("SHA", "50982bb7b64d620c9e5270930cc2963a2f97100e",
                                    d_record={'repo_name': 'TuGraph-family/tugraph-db'})
-    print(obj.get_dict())
+    print(obj.__type__, obj.get_dict())

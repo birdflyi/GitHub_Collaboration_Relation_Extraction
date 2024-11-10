@@ -80,10 +80,10 @@ def mask_code(string):
     # 正则表达式来匹配单行引用（以>开始）
     singleLine_qoute_pattern = re.compile(r'>.*\r?\n')
     # 替换代码块
-    string_mask_code__block = re.sub(code_block_pattern, "CODE_BLOCK", string)
-    # 替换行内代码
-    string_mask_code = re.sub(inline_code_pattern, "INLINE_CODE", string_mask_code__block)
-    string_mask_code = re.sub(singleLine_qoute_pattern, "SINGLELINE_CODE", string_mask_code)
+    string_mask_code__block = re.sub(code_block_pattern, "[CODE_BLOCK]", string)
+    # 替换行内代码, add bound to avoid @healthy-podINLINE_CODE
+    string_mask_code = re.sub(inline_code_pattern, "[INLINE_CODE]", string_mask_code__block)
+    string_mask_code = re.sub(singleLine_qoute_pattern, "[SINGLELINE_CODE]", string_mask_code)
     return string_mask_code
 
 

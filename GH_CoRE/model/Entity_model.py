@@ -85,8 +85,41 @@ class Obj_exid:
         exid_kwargs = None
         if len(keys) <= len(values):
             if len(keys) < len(values):
+                def find_first_occurrence(char, text):
+                    try:
+                        return text.index(char)
+                    except ValueError:
+                        return -1  # 如果字符不在字符串中，返回-1
+
+                d_sep_first_indexes = {}
+                ambiguous_pattern = False
+                for sep in Obj_exid.exid_seps:
+                    sep_first_index = find_first_occurrence(sep, exid_template)
+                    if d_sep_first_indexes.get(sep, None) is not None:
+                        ambiguous_pattern = True
+                    d_sep_first_indexes[sep] = sep_first_index
+                if ambiguous_pattern:
+                    print(f"Find ambiguous sep pattern in {exid_template} using the same separator multi-times, which "
+                          f"may cause wrong parse result when execute get_kwargs_from_exid! "
+                          f"Please change the exid_template in Obj_exid.exid_map and Obj_exid.exid_seps.")
+                d_sep_first_indexes_sorted_by_val = sorted(d_sep_first_indexes.items(), key=lambda x: x[1])
+                d_sep_first_indexes_sorted_by_val = dict(d_sep_first_indexes_sorted_by_val)
+                values = []
+                curr_raw_str = exid_string
+                for sep, ind in d_sep_first_indexes_sorted_by_val.items():
+                    if ind >= 0:
+                        v_str, curr_raw_str = curr_raw_str.split(sep, 1)
+                        values.append(v_str)
+                values.append(curr_raw_str)
+                if len(values) < len(keys):
+                    values += [''] * (len(keys) - len(values))
+                values = values[:len(keys)]
                 print(
-                    f"Warning: the values length is less than the keys length! It will be truncated in order, and the result may be incorrect: \n\t{keys}, {values}")
+                    f"Warning: the values length is less than the keys length! It will be separated at "
+                    f"the position of the first sep in the order it appears in the pattern {exid_template}, "
+                    f"and the result may be incorrect: \n\t{keys}, {values}")
+            else:
+                pass
             exid_kwargs = dict(zip(keys, values))
         else:
             print(
@@ -460,9 +493,9 @@ class ObjEntity(object):
 if __name__ == '__main__':
     from GH_CoRE.model.tst_case import df_tst
 
-    tag_exid = Obj_exid.get_exid('_release_tag_exid', {"repo_id": 123456, "tag_name": "v1.2.3"})
+    tag_exid = Obj_exid.get_exid('_release_tag_exid', {"repo_id": 16563587, "tag_name": "@cockroachlabs/cluster-ui@24.3.2"})
     print(tag_exid)
-    tag_exid_params = Obj_exid.get_kwargs_from_exid('_release_tag_exid', "123456@v1.2.3")
+    tag_exid_params = Obj_exid.get_kwargs_from_exid("_release_tag_exid", "16563587@@cockroachlabs/cluster-ui@24.3.2")
     print(tag_exid_params)
 
     Branch = ObjEntity("Branch")
