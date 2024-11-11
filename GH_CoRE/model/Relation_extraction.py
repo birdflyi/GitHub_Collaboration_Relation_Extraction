@@ -8,6 +8,7 @@
 
 import copy
 import os
+from functools import partial
 
 import pandas as pd
 
@@ -19,6 +20,7 @@ from GH_CoRE.model.Entity_recognition import get_df_bodyRegLinks_eachLinkPatType
 from GH_CoRE.model.Entity_search import get_ent_obj_in_link_text
 from GH_CoRE.model.Event_model import Event
 from GH_CoRE.model.Relation_model import Relation, get_relation_label_repr
+from GH_CoRE.utils.cache import QueryCache
 
 
 def get_df_and_dict_format_record(record):
@@ -65,7 +67,10 @@ def match_eventType_params_with_record(eventType_params_patterns, record):
     return matched_pattern
 
 
-def get_obj_collaboration_tuples_from_record(record, extract_mode=3):
+def get_obj_collaboration_tuples_from_record(record, extract_mode=3, cache=None):
+    if cache is None:
+        cache = QueryCache(max_size=200)
+        cache.match_func = partial(QueryCache.d_match_func, **{"feat_keys": ["link_pattern_type", "link_text", "rec_repo_id"]})
     obj_collaboration_tuple_list = []
     df_record, d_record = get_df_and_dict_format_record(record)
     if not len(df_record):
@@ -132,7 +137,16 @@ def get_obj_collaboration_tuples_from_record(record, extract_mode=3):
                         if isinstance(body_regexed_links, list):  # 此record的body匹配到的link列表，否则只能是pd.isna
                             for link_text in body_regexed_links:
                                 # Entity Search
-                                obj_nt_from_body = get_ent_obj_in_link_text(link_pattern_type, link_text, d_record)
+                                feature_new_rec = {"link_pattern_type": link_pattern_type, "link_text": link_text, "rec_repo_id": d_record.get("repo_id")}
+                                new_record_cached = cache.find_record_in_cache(feature_new_rec)
+                                if new_record_cached:
+                                    # print(f"find new record in cache: {new_record_cached}")
+                                    obj_nt_from_body = dict(new_record_cached).get("obj_nt_from_body", ObjEntity("Obj"))
+                                else:
+                                    obj_nt_from_body = get_ent_obj_in_link_text(link_pattern_type, link_text, d_record)
+                                    new_record = dict(**feature_new_rec, **{"obj_nt_from_body": obj_nt_from_body})
+                                    cache.add_record(new_record)
+
                                 objnt_prop_dict = obj_nt_from_body.get_dict().get("objnt_prop_dict", None)
                                 duplicate_matching = False
                                 if objnt_prop_dict:
@@ -152,7 +166,7 @@ def get_obj_collaboration_tuples_from_record(record, extract_mode=3):
             raise TypeError(
                 "The source_node_label and target_node_label in the 'df_ref_tuples_raw' shouldnot be related to body links at the same time." \
                 "Try using Event entities to resolve the relationships between them.")
-    return obj_collaboration_tuple_list
+    return obj_collaboration_tuple_list, cache
 
 
 # set extend_field=True if the uncertain type object links need to be saved.
@@ -220,7 +234,8 @@ if __name__ == '__main__':
         # "release_body": "",
     }
     # match_eventType_params_with_record(eventType_params, d_rec)
-    obj_collaboration_tuple_list = get_obj_collaboration_tuples_from_record(d_rec)
+    cache = None
+    obj_collaboration_tuple_list, cache = get_obj_collaboration_tuples_from_record(d_rec, cache=cache)
     print(obj_collaboration_tuple_list)
     pd.set_option('display.max_columns', None)
     df_collaboration = get_df_collaboration(obj_collaboration_tuple_list, extend_field=True)

@@ -23,13 +23,16 @@ if pkg_rootdir not in sys.path:  # 解决ipynb引用上层路径中的模块时�
 
 __all__ = [
     "logUtils",  # sub-package needs to be imported and to extend __all__
-    "check_type",  # file in this package just list out
+    # file in this package just list out
+    "cache",
+    "check_type",
     "conndb",
     "prepare_sql",
     "request_api",
 ]
 
 from GH_CoRE.utils import logUtils  # sub-package needs to be imported and to extend __all__
+from GH_CoRE.utils.cache import *
 from GH_CoRE.utils.check_type import *
 from GH_CoRE.utils.conndb import *
 from GH_CoRE.utils.prepare_sql import *

@@ -24,6 +24,8 @@ if pkg_rootdir not in sys.path:  # 解决ipynb引用上层路径中的模块时�
 
 import logging
 
+from functools import partial
+
 from etc import filePathConf
 from GH_CoRE.data_dict_settings import columns_simple
 from GH_CoRE.working_flow.body_content_preprocessing import read_csvs, dedup_content
@@ -31,6 +33,7 @@ from GH_CoRE.model.Relation_extraction import get_obj_collaboration_tuples_from_
     save_GitHub_Collaboration_Network
 from GH_CoRE.working_flow.query_OSDB_github_log import query_repo_log_each_year_to_csv_dir, get_repo_name_fileformat, \
     get_repo_year_filename
+from GH_CoRE.utils.cache import QueryCache
 from GH_CoRE.utils.logUtils import setup_logging
 
 
@@ -57,7 +60,7 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
 
     # Download sample data
-    repo_names = ["facebook/rocksdb", "TuGraph-family/tugraph-db"][0:1]
+    repo_names = ["TuGraph-family/tugraph-db", "facebook/rocksdb", "cockroachdb/cockroach"][0:1]
     dbms_repos_raw_content_dir = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR], 'repos')
     year = 2023
     sql_param = {
@@ -89,6 +92,8 @@ if __name__ == '__main__':
     I_REPO_LOC = 1
     I_RECORD_LOC = 2
     process_checkpoint = ['', 0, 0]
+    cache = QueryCache(max_size=200)
+    cache.match_func = partial(QueryCache.d_match_func, **{"feat_keys": ["link_pattern_type", "link_text", "rec_repo_id"]})
     try:
         for i, repo_key in enumerate(repo_keys):
             process_checkpoint[I_REPO_KEY] = repo_key
@@ -105,7 +110,7 @@ if __name__ == '__main__':
                         break
                 if index < rec_add_mode_skip_to_loc:
                     continue
-                obj_collaboration_tuple_list = get_obj_collaboration_tuples_from_record(rec)
+                obj_collaboration_tuple_list, cache = get_obj_collaboration_tuples_from_record(rec, cache=cache)
                 df_collaboration = get_df_collaboration(obj_collaboration_tuple_list, extend_field=True)
                 save_GitHub_Collaboration_Network(df_collaboration, save_path=save_path, add_mode_if_exists=True)
             logger.info(f"Processing progress: {repo_key}@{i}#{process_checkpoint[I_RECORD_LOC]}: task completed!")
