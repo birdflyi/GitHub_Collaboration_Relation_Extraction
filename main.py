@@ -115,7 +115,7 @@ def collaboration_relation_extraction(repo_keys, df_dbms_repos_dict, save_dir, r
             if i < repo_key_skip_to_loc:
                 continue
             df_repo = df_dbms_repos_dict[repo_key]
-            save_path = os.path.join(save_dir, f'GitHub_Collaboration_Network_repos/{repo_key}.csv')
+            save_path = os.path.join(save_dir, f'{repo_key}.csv')
             if os.path.exists(save_path) and not update_exists:
                 continue
 
