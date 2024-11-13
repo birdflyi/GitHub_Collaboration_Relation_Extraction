@@ -12,7 +12,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 
 
 def setup_logging(
-        default_path=os.path.join(BASE_DIR, 'etc/logging.json'),
+        base_dir=BASE_DIR,
+        default_path=None,
         default_level=logging.INFO,
         env_key='LOG_CFG'
         ):
@@ -21,11 +22,11 @@ def setup_logging(
     You can load your own logging configuration like:
         LOG_CFG=my_new_logging.json python my_server.py
     """
-    path = default_path
+    path = default_path or os.path.join(base_dir, 'etc/logging.json')
     value = os.getenv(env_key, None)
     if value:  # check if LOG_CFG valid
         path = value
-    log_dir = os.path.join(BASE_DIR, 'logs')  # default logs dir
+    log_dir = os.path.join(base_dir, 'logs')  # default logs dir
     if os.path.exists(path):
         with open(path, 'rt') as f:
             config = json.load(f)
@@ -42,7 +43,10 @@ def setup_logging(
 
 def main():
     import logging
-    setup_logging()
+
+    from etc import pkg_rootdir
+
+    setup_logging(base_dir=pkg_rootdir)
     logger = logging.getLogger(__name__)
     logger.info('Hi,foo')
     try:

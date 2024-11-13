@@ -6,6 +6,7 @@
 # @Author : 'Lou Zehua'
 # @File   : identify_reference.py
 
+import os
 import pickle
 import re
 import numpy as np
@@ -347,7 +348,6 @@ def load_pickle(load_path):
 
 
 if __name__ == '__main__':
-    import os
     from etc import filePathConf
 
     # 读入csv，筛选项目
