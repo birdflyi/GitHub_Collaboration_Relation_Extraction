@@ -195,7 +195,7 @@ def event_trim_subType(node_type):
 
 def relation_type_filter(relation_type, use_relation_type_list, raw=True):
     if raw:
-        flag = any([str(s).startswith(relation_type) for s in use_relation_type_list])
+        flag = any([str(relation_type).startswith(s) for s in use_relation_type_list])
     else:
         flag = relation_type in use_relation_type_list
     return flag
@@ -241,7 +241,7 @@ if __name__ == '__main__':
     if IGNORE_BODY_CROSS_REFERENCE:
         df_ref_tuples = df_ref_tuples[df_ref_tuples_raw.apply(record_from_body_ref_filter, axis=1)]  # filter the body reference
     # option to extract the relations ['EventAction', 'Reference']: any or combinations or all of them
-    df_ref_tuples = df_ref_tuples[df_ref_tuples["relation_type"].apply(relation_type_filter, use_relation_type_list=['Reference'])]
+    df_ref_tuples = df_ref_tuples[df_ref_tuples[columns_df_ref_tuples[2]].apply(relation_type_filter, use_relation_type_list=['Reference'])]
     print(df_ref_tuples)
 
     node_type_set = set(df_ref_tuples["source_node_type"]).union(set(df_ref_tuples["target_node_type"]))
