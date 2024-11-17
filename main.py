@@ -81,7 +81,7 @@ def process_body_content(raw_content_dir=None, processed_content_dir=None, filen
 
 def collaboration_relation_extraction(repo_keys, df_dbms_repos_dict, save_dir, repo_key_skip_to_loc=None,
                                       last_stop_index=None, limit=None, update_exists=True, add_mode_if_exists=True,
-                                      cache_max_size=200):
+                                      cache_max_size=200, use_relation_type_list=None):
     """
     :param repo_keys: filenames right stripped by suffix `.csv`
     :param df_dbms_repos_dict: key: repo_keys, value: dataframe of dbms repos event logs
@@ -92,6 +92,7 @@ def collaboration_relation_extraction(repo_keys, df_dbms_repos_dict, save_dir, r
     :param update_exists: only process repo_keys not exists old result when update_exists=False
     :param add_mode_if_exists: only takes effect when parameter update_exists=True
     :param cache_max_size: int type, set cache_max_size=-1 if you donot want to use any cache
+    :param use_relation_type_list: to optionally extract the relation types in ['EventAction', 'Reference'], see event_trigger_ERE_triples_dict.
     :return: None
     """
     repo_key_skip_to_loc = repo_key_skip_to_loc if repo_key_skip_to_loc is not None else 0
@@ -128,7 +129,8 @@ def collaboration_relation_extraction(repo_keys, df_dbms_repos_dict, save_dir, r
                         break
                 if index < rec_add_mode_skip_to_loc:
                     continue
-                obj_collaboration_tuple_list, cache = get_obj_collaboration_tuples_from_record(rec, cache=cache)
+                obj_collaboration_tuple_list, cache = get_obj_collaboration_tuples_from_record(
+                    rec, cache=cache, use_relation_type_list=use_relation_type_list)
                 df_collaboration = get_df_collaboration(obj_collaboration_tuple_list, extend_field=True)
                 save_GitHub_Collaboration_Network(df_collaboration, save_path=save_path, add_mode_if_exists=add_mode_if_exists)
             logger.info(f"Processing progress: {repo_key}@{i}#{process_checkpoint[I_RECORD_LOC]}: task completed!")
@@ -180,7 +182,7 @@ if __name__ == '__main__':
     relation_extraction_save_dir = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR],
                                                 "GitHub_Collaboration_Network_repos")
     collaboration_relation_extraction(repo_keys, df_dbms_repos_dict, relation_extraction_save_dir, update_exists=True,
-                                      add_mode_if_exists=True)
+                                      add_mode_if_exists=True, use_relation_type_list=["EventAction", "Reference"])
 
     # # Just for test
     # import pandas as pd

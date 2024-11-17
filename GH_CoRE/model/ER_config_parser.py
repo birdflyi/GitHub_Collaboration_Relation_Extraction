@@ -193,6 +193,14 @@ def event_trim_subType(node_type):
     return nt_trimmed
 
 
+def relation_type_filter(relation_type, use_relation_type_list, raw=True):
+    if raw:
+        flag = any([str(s).startswith(relation_type) for s in use_relation_type_list])
+    else:
+        flag = relation_type in use_relation_type_list
+    return flag
+
+
 event_triggers = sorted(list(event_trigger_ERE_triples_dict.keys()))
 eventType_params = get_eventType_params_list_from_joined_strs(event_triggers)
 
@@ -232,6 +240,8 @@ if __name__ == '__main__':
     IGNORE_BODY_CROSS_REFERENCE = False  # 当设置为True时，图模式中不显示BODY_CROSS_REFERENCE有关的连边。
     if IGNORE_BODY_CROSS_REFERENCE:
         df_ref_tuples = df_ref_tuples[df_ref_tuples_raw.apply(record_from_body_ref_filter, axis=1)]  # filter the body reference
+    # option to extract the relations ['EventAction', 'Reference']: any or combinations or all of them
+    df_ref_tuples = df_ref_tuples[df_ref_tuples["relation_type"].apply(relation_type_filter, use_relation_type_list=['Reference'])]
     print(df_ref_tuples)
 
     node_type_set = set(df_ref_tuples["source_node_type"]).union(set(df_ref_tuples["target_node_type"]))

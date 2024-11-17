@@ -12,8 +12,9 @@ from functools import partial
 
 import pandas as pd
 
+from GH_CoRE.model import ER_config_parser
 from GH_CoRE.model.Attribute_getter import _get_field_from_db
-from GH_CoRE.model.ER_config_parser import eventType_params2repr, match_substr__from_body, df_ref_tuples_raw, \
+from GH_CoRE.model.ER_config_parser import eventType_params2repr, match_substr__from_body, relation_type_filter, \
     eventType_params
 from GH_CoRE.model.Entity_model import ObjEntity
 from GH_CoRE.model.Entity_recognition import get_df_bodyRegLinks_eachLinkPatType
@@ -67,7 +68,7 @@ def match_eventType_params_with_record(eventType_params_patterns, record):
     return matched_pattern
 
 
-def get_obj_collaboration_tuples_from_record(record, extract_mode=3, cache=None):
+def get_obj_collaboration_tuples_from_record(record, extract_mode=3, cache=None, use_relation_type_list=None):
     if cache is None:
         cache = QueryCache(max_size=200)
         cache.match_func = partial(QueryCache.d_match_func, **{"feat_keys": ["link_pattern_type", "link_text", "rec_repo_id"]})
@@ -83,6 +84,10 @@ def get_obj_collaboration_tuples_from_record(record, extract_mode=3, cache=None)
     matched_eventType_params = match_eventType_params_with_record(eventType_params, d_record)
     matched_eventType_params_repr = eventType_params2repr(matched_eventType_params[0], matched_eventType_params[1])
     # 获得Event type的三元组模式
+    df_ref_tuples_raw = ER_config_parser.df_ref_tuples_raw
+    if use_relation_type_list is not None:
+        df_ref_tuples_raw = df_ref_tuples_raw[
+            df_ref_tuples_raw["relation_type"].apply(relation_type_filter, use_relation_type_list=use_relation_type_list)]
     df_matched_ref_pattern = df_ref_tuples_raw[df_ref_tuples_raw['event_trigger'] == matched_eventType_params_repr]
     # 构建元组
     for matched_ref_pattern_dict in df_matched_ref_pattern.to_dict("records"):
