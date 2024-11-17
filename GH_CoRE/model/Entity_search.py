@@ -17,19 +17,21 @@ from GH_CoRE.model.Attribute_getter import get_repo_id_by_repo_full_name, _get_f
 from GH_CoRE.model.Entity_model import ObjEntity
 from GH_CoRE.utils.request_api import GitHubGraphQLAPI, RequestGitHubAPI
 
+default_node_type = ObjEntity.default_type
+
 d_link_pattern_type_nt = {
-    "Issue_PR": ["Issue", "PullRequest", "IssueComment", "PullRequestReview", "PullRequestReviewComment", "Obj"],
-    "SHA": ["Commit", "Obj"],
-    "Actor": ["Actor", "Obj"],
-    "Repo": ["Repo", "Obj"],
-    "Branch_Tag_GHDir": ["Branch", "Tag", "Obj"],
-    "CommitComment": ["CommitComment", "Obj"],
-    "Gollum": ["Gollum", "Obj"],
-    "Release": ["Release", "Obj"],
-    "GitHub_Files_FileChanges": ["Obj"],  # 可以与owner, repo_name关联
-    "GitHub_Other_Links": ["Obj"],  # 可以与owner, repo_name关联
-    "GitHub_Other_Service": ["Obj"],  # 可以与owner关联，并确定service根网址属性
-    "GitHub_Service_External_Links": ["Obj"],
+    "Issue_PR": ["Issue", "PullRequest", "IssueComment", "PullRequestReview", "PullRequestReviewComment", default_node_type],
+    "SHA": ["Commit", default_node_type],
+    "Actor": ["Actor", default_node_type],
+    "Repo": ["Repo", default_node_type],
+    "Branch_Tag_GHDir": ["Branch", "Tag", default_node_type],
+    "CommitComment": ["CommitComment", default_node_type],
+    "Gollum": ["Gollum", default_node_type],
+    "Release": ["Release", default_node_type],
+    "GitHub_Files_FileChanges": [default_node_type],  # 可以与owner, repo_name关联
+    "GitHub_Other_Links": [default_node_type],  # 可以与owner, repo_name关联
+    "GitHub_Other_Service": [default_node_type],  # 可以与owner关联，并确定service根网址属性
+    "GitHub_Service_External_Links": [default_node_type],
 }
 
 URL_ESCAPE_CHARS = "_-.'/()!"
@@ -54,7 +56,7 @@ def encode_urls(path_list, safe=URL_ESCAPE_CHARS):
     return [quote(path, safe=safe) for path in path_list]
 
 
-def get_issue_type_by_repo_id_issue_number(repo_id, issue_number):
+def get_issue_type_by_repo_id_issue_number(repo_id, issue_number, default_node_type=default_node_type):
     if not repo_id or not issue_number:
         return None
 
@@ -65,7 +67,7 @@ def get_issue_type_by_repo_id_issue_number(repo_id, issue_number):
         "PullRequestEvent": "PullRequest",
     }
     if event_type:
-        node_type = I_PR_evntType_nodeType_dict.get(event_type, "Obj")
+        node_type = I_PR_evntType_nodeType_dict.get(event_type, default_node_type)
     else:
         node_type = __get_issue_type(repo_id, issue_number)
     return node_type
@@ -211,7 +213,7 @@ def get_first_match_or_none(pattern, string):
 
 
 # Entity Search
-def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
+def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_node_type=default_node_type):
     if not link_text:
         return None
     if d_record is None:
@@ -220,26 +222,25 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
     nt = None
     objnt_prop_dict = None
     d_val = {"match_text": link_text, "match_pattern_type": link_pattern_type, "objnt_prop_dict": objnt_prop_dict}
-    default_node_type = "Obj"
     if link_pattern_type == "Issue_PR":
         if re.search(r"#discussion_r\d+(?![\d#/])", link_text) or re.search(
-                r"/files(?:/[0-9a-fA-F]{40})?#r\d+(?![\d#/])", link_text):
+                r"/(?:files|commits)(?:/[0-9a-fA-F]{40})?#r\d+(?![\d#/])", link_text):
             nt = "PullRequestReviewComment"
             # https://github.com/redis/redis/pull/10502/files#r839879682
             # https://github.com/X-lab2017/open-digger/pull/1487/files/17fa11a4cb104bce9feaf9a9bc13003862480219#r1448367800
+            # https://github.com/cockroachdb/cockroach/pull/104294/commits/948ec1e56a6226b4e892247239484bb08fc3631d#r1220583001
             # https://github.com/redis/redis/pull/10502#discussion_r839879682
             repo_name = get_first_match_or_none(
                 r'(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*(?=(?=/issues)|(?=/pull))', link_text)
             repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                 "repo_name") else d_record.get("repo_id")
             issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
+            pull_merge_commit_sha = get_first_match_or_none(r'[0-9a-fA-F]{40}(?=#r)', link_text)
             pull_review_comment_id = get_first_match_or_none(r'(?<=(?<=#discussion_r)|(?<=#r))\d+', link_text)
-            d_val['repo_id'] = repo_id
-            d_val['repo_name'] = repo_name
-            d_val['issue_number'] = issue_number
-            d_val['pull_review_comment_id'] = pull_review_comment_id
-            objnt_prop_dict = {"issue_number": issue_number, 'pull_review_comment_id': pull_review_comment_id}
-            d_val['objnt_prop_dict'] = objnt_prop_dict
+            objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "issue_number": issue_number, 'pull_review_comment_id': pull_review_comment_id}
+            if pull_merge_commit_sha:
+                objnt_prop_dict["pull_merge_commit_sha"] = pull_merge_commit_sha
+            d_val.update(objnt_prop_dict)
         elif re.search(r"#pullrequestreview-\d+(?![\d#/])", link_text):
             nt = "PullRequestReview"
             # https://github.com/redis/redis/pull/10502#pullrequestreview-927978437
@@ -249,12 +250,8 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                 "repo_name") else d_record.get("repo_id")
             issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
             pull_review_id = get_first_match_or_none(r'(?<=#pullrequestreview-)\d+', link_text)
-            d_val['repo_id'] = repo_id
-            d_val['repo_name'] = repo_name
-            d_val['issue_number'] = issue_number
-            d_val['pull_review_id'] = pull_review_id
-            objnt_prop_dict = {"issue_number": issue_number, 'pull_review_id': pull_review_id}
-            d_val['objnt_prop_dict'] = objnt_prop_dict
+            objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "issue_number": issue_number, 'pull_review_id': pull_review_id}
+            d_val.update(objnt_prop_dict)
         elif re.search(r"#issuecomment-\d+(?![\d#/])", link_text):
             nt = "IssueComment"
             # 'https://github.com/redis/redis/issues/10472#issuecomment-1126545338',
@@ -264,12 +261,8 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                 "repo_name") else d_record.get("repo_id")
             issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
             issue_comment_id = get_first_match_or_none(r'(?<=#issuecomment-)\d+', link_text)
-            d_val['repo_id'] = repo_id
-            d_val['repo_name'] = repo_name
-            d_val['issue_number'] = issue_number
-            d_val['issue_comment_id'] = issue_comment_id
-            objnt_prop_dict = {"issue_number": issue_number, 'issue_comment_id': issue_comment_id}
-            d_val['objnt_prop_dict'] = objnt_prop_dict
+            objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "issue_number": issue_number, 'issue_comment_id': issue_comment_id}
+            d_val.update(objnt_prop_dict)
         elif re.search(r"/pull/\d+(?![\d#/])", link_text) or re.search(r"/pull/\d+#[-_0-9a-zA-Z\.%#/:]+-\d+(?![\d/])", link_text):
             nt = "PullRequest"
             # https://github.com/redis/redis/pull/10587#event-6444202459
@@ -279,7 +272,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                 "repo_name") else d_record.get("repo_id")
             issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
             issue_elemName_elemIds = get_first_match_or_none(r'(?<=#)[-_0-9a-zA-Z\.%#/:]+-\d+', link_text)
-            objnt_prop_dict = {"issue_number": issue_number}
+            objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name,"issue_number": issue_number}
             if issue_elemName_elemIds:
                 try:
                     issue_elemName_elemId = issue_elemName_elemIds[0]
@@ -288,10 +281,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                     objnt_prop_dict[issue_elemName] = issue_elemId
                 except BaseException:
                     pass
-            d_val['repo_id'] = repo_id
-            d_val['repo_name'] = repo_name
-            d_val['issue_number'] = issue_number
-            d_val['objnt_prop_dict'] = objnt_prop_dict
+            d_val.update(objnt_prop_dict)
         elif re.search(r"/issues/\d+(?![\d#/])", link_text) or re.search(r"/issues/\d+#[-_0-9a-zA-Z\.%#/:]+-\d+(?![\d/])", link_text):
             nt = "Issue"
             # https://github.com/X-lab2017/open-research/issues/123#issue-1406887967
@@ -301,7 +291,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                 "repo_name") else d_record.get("repo_id")
             issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
             issue_elemName_elemIds = get_first_match_or_none(r'(?<=#)[-_0-9a-zA-Z\.%#/:]+-\d+', link_text)
-            objnt_prop_dict = {"issue_number": issue_number}
+            objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "issue_number": issue_number}
             if issue_elemName_elemIds:
                 try:
                     issue_elemName_elemId = issue_elemName_elemIds[0]
@@ -310,10 +300,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                     objnt_prop_dict[issue_elemName] = issue_elemId
                 except BaseException:
                     pass
-            d_val['repo_id'] = repo_id
-            d_val['repo_name'] = repo_name
-            d_val['issue_number'] = issue_number
-            d_val['objnt_prop_dict'] = objnt_prop_dict
+            d_val.update(objnt_prop_dict)
         elif re.search(r".*#0*[1-9][0-9]*(?![\d/#a-z])", link_text):
             repo_id = None
             repo_name = None
@@ -344,32 +331,34 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                 elif d_record.get("repo_name"):
                     repo_name = d_record.get("repo_name")
                     repo_id = d_record.get("repo_id") or get_repo_id_by_repo_full_name(repo_name)
-                nt = get_issue_type_by_repo_id_issue_number(repo_id, issue_number) or "Obj"  # uncertain
+                nt = get_issue_type_by_repo_id_issue_number(repo_id, issue_number) or default_node_type  # uncertain
             elif re.findall(r"^(?:[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*#)\d+$", link_text):  # e.g. redis/redis-doc#1711
                 repo_name = get_first_match_or_none(r'[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*(?=#)',
                                                     link_text)
                 repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                     "repo_name") else d_record.get("repo_id")
                 issue_number = get_first_match_or_none(r'(?<=#)0*[1-9][0-9]*', link_text)
-                nt = get_issue_type_by_repo_id_issue_number(repo_id, issue_number) or "Obj"  # uncertain
+                nt = get_issue_type_by_repo_id_issue_number(repo_id, issue_number) or default_node_type  # uncertain
             else:
-                nt = "Obj"  # obj e.g. 'RB#26080', 'BUG#32134875', 'BUG#31553323'
+                nt = default_node_type  # obj e.g. 'RB#26080', 'BUG#32134875', 'BUG#31553323'
                 issue_number = None
 
-            if nt == "Obj":
+            if nt == default_node_type:
                 objnt_prop_dict = {"numbers": re.findall(r"(?<=#)\d+", link_text)}
                 if link_text.startswith('http'):  # 以http开头必可被其他pattern识别，此处被重复识别
                     objnt_prop_dict["label"] = "Text_Locator"
                     objnt_prop_dict["duplicate_matching"] = True
-            elif issue_number is not None:
-                objnt_prop_dict = {"issue_number": issue_number}
             else:
-                objnt_prop_dict = {"numbers": re.findall(r"(?<=#)\d+", link_text)}
+                objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name}
+                if issue_number is not None:
+                    objnt_prop_dict.update({"issue_number": issue_number})
+                else:
+                    objnt_prop_dict.update({"numbers": re.findall(r"(?<=#)\d+", link_text)})
 
             d_val['repo_id'] = repo_id
             d_val['repo_name'] = repo_name
             d_val['issue_number'] = issue_number
-            d_val["objnt_prop_dict"] = objnt_prop_dict
+            d_val.update(objnt_prop_dict)
         else:  # should never be reached
             pass
     elif link_pattern_type == "SHA":
@@ -382,11 +371,8 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
             repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                 "repo_name") else d_record.get("repo_id")
             commit_sha = get_first_match_or_none(r'(?<=(?<=commits/)|(?<=commit/))[0-9a-fA-F]{40}', link_text)
-            d_val['repo_id'] = repo_id
-            d_val['repo_name'] = repo_name
-            d_val['commit_sha'] = commit_sha
-            objnt_prop_dict = {"commit_sha": commit_sha}
-            d_val['objnt_prop_dict'] = objnt_prop_dict
+            objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "commit_sha": commit_sha}
+            d_val.update(objnt_prop_dict)
         elif re.search(r"^[0-9a-fA-F]{40}$", link_text):
             repo_id = d_record.get("repo_id")
             repo_name = d_record.get("repo_name")
@@ -407,8 +393,8 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
             #         repo_id = repo_id_ck
             #         repo_name = get_repo_name_by_repo_id(repo_id)
             #         is_outer_commit_sha = True
-            find_sha_by_ck = is_inner_commit_sha or is_outer_commit_sha
-            if not find_sha_by_ck:  # is_inner_commit_sha and is_outer_commit_sha == False
+            find_sha_by_ClickHouse = is_inner_commit_sha or is_outer_commit_sha
+            if not find_sha_by_ClickHouse:  # is_inner_commit_sha and is_outer_commit_sha == False
                 requestGitHubAPI = RequestGitHubAPI(url_pat_mode='id')
                 get_commit_url = requestGitHubAPI.get_url("commit", params={"repo_id": repo_id, "commit_sha": commit_sha})
                 response = requestGitHubAPI.request(get_commit_url)
@@ -419,20 +405,16 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                     response = None  # 由于Clickhouse在仅知道sha情况下查询日志会超出内存限制，而GitHub API查询完整sha需要repo_id，因此repo_id未知时不再作直接根据sha查询记录的尝试
                     is_outer_commit_sha = bool(response)
             find_sha_by_api = is_inner_commit_sha or is_outer_commit_sha
-            if find_sha_by_ck or find_sha_by_api:
+            if find_sha_by_ClickHouse or find_sha_by_api:
                 nt = "Commit"
-                objnt_prop_dict = {"commit_sha": commit_sha}
+                objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "commit_sha": commit_sha}
             else:  # 可能是查询的异常
-                nt = "Obj"  # uncertain
-                repo_id = None
-                repo_name = None
+                nt = default_node_type  # Uncertain entity ownership
+                d_val["repo_id"] = None
+                d_val["repo_name"] = None
+                d_val['commit_sha'] = None
                 objnt_prop_dict = {"sha": link_text, "status": "QuickSearchFailed", "label": "SHA"}
-                d_val["objnt_prop_dict"] = objnt_prop_dict
-                commit_sha = None
-            d_val['repo_id'] = repo_id
-            d_val['repo_name'] = repo_name
-            d_val['commit_sha'] = commit_sha
-            d_val['objnt_prop_dict'] = objnt_prop_dict
+            d_val.update(objnt_prop_dict)
         elif re.search(r"[0-9a-fA-F]{7}$", link_text):
             repo_id = d_record.get("repo_id")
             repo_name = d_record.get("repo_name")
@@ -443,12 +425,12 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
             sha_abbr_7 = get_first_match_or_none(r'[0-9a-fA-F]{7}$', link_text)
             if 'COMMIT' in link_text.upper() or 'SHA' in link_text.upper():
                 nt = 'Commit'
-            elif sha_abbr_7 is None or str.isdigit(link_text):  # 未包含COMMIT与SHA的前缀且link_text全是数字，仍然是sha的事件是极小概率事件
-                nt = 'Obj'
+            elif sha_abbr_7 is None or str.isdigit(link_text):  # 未包含COMMIT与SHA的https模式前缀且link_text全是数字，仍然是sha的事件是极小概率事件
+                nt = default_node_type
             else:  # still unknown
                 nt = None
 
-            if nt == 'Obj':
+            if nt == default_node_type:
                 repo_id = None
                 repo_name = None
                 commit_sha = None
@@ -466,8 +448,8 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                 #         repo_id = repo_id_ck
                 #         repo_name = get_repo_name_by_repo_id(repo_id)
                 #         is_outer_commit_sha = True
-                find_sha_by_ck = is_inner_commit_sha or is_outer_commit_sha
-                if not find_sha_by_ck:  # is_inner_commit_sha and is_outer_commit_sha == False
+                find_sha_by_ClickHouse = is_inner_commit_sha or is_outer_commit_sha
+                if not find_sha_by_ClickHouse:  # is_inner_commit_sha and is_outer_commit_sha == False
                     requestGitHubAPI = RequestGitHubAPI(url_pat_mode='id')
                     get_commit_url = requestGitHubAPI.get_url("commit", params={"repo_id": repo_id, "commit_sha": sha_abbr_7})
                     response = requestGitHubAPI.request(get_commit_url)
@@ -478,7 +460,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                         response = None  # 由于Clickhouse在仅知道sha情况下查询日志会超出内存限制，而GitHub API查询完整sha需要repo_id，因此repo_id未知时不再作直接根据sha查询记录的尝试
                         is_outer_commit_sha = bool(response)
                 find_sha_by_api = is_inner_commit_sha or is_outer_commit_sha
-                if find_sha_by_ck or find_sha_by_api:
+                if find_sha_by_ClickHouse or find_sha_by_api:
                     nt = "Commit"
                     objnt_prop_dict = {"sha_abbr_7": link_text, "commit_sha": commit_sha}
                 else:
@@ -490,16 +472,16 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                             nt = "Commit"
                             objnt_prop_dict = {"sha_abbr_7": link_text, "status": "QuickSearchFailed", "label": "Commit SHA"}
                         else:
-                            nt = "Obj"
+                            nt = default_node_type
                             objnt_prop_dict = {"sha_abbr_7": link_text, "status": "QuickSearchFailed", "label": "SHA"}
                     else:
-                        nt = "Obj"  #  uncertain，nt为None时重置为默认值Obj
+                        nt = default_node_type  #  uncertain，nt为None时重置为默认值Obj
                         objnt_prop_dict = {"sha_abbr_7": link_text}
 
-            d_val['repo_id'] = repo_id
-            d_val['repo_name'] = repo_name
             d_val['commit_sha'] = commit_sha
-            d_val["objnt_prop_dict"] = objnt_prop_dict
+            d_repo_info = {"repo_id": repo_id, "repo_name": repo_name}
+            objnt_prop_dict = dict(**d_repo_info, **objnt_prop_dict)
+            d_val.update(objnt_prop_dict)
         else:
             pass  # should never be reached
     elif link_pattern_type == "Actor":
@@ -509,9 +491,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
             actor_id = get_actor_id_by_actor_login(actor_login) if actor_login != d_record.get(
                 "actor_login") else d_record.get("actor_id")
             objnt_prop_dict = {"actor_id": actor_id, "actor_login": actor_login}
-            d_val["actor_login"] = actor_login
-            d_val["actor_id"] = actor_id
-            d_val["objnt_prop_dict"] = objnt_prop_dict
+            d_val.update(objnt_prop_dict)
         elif '@' in link_text:  # @actor_login @normal_text
             if link_text.startswith('@'):
                 actor_login = link_text.split('@', 1)[-1]
@@ -529,13 +509,13 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                 nt = "Actor"
                 objnt_prop_dict = {"actor_id": actor_id, "actor_login": actor_login}
             else:
-                nt = "Obj"
+                nt = default_node_type
                 actor_login = None
                 actor_id = None
                 objnt_prop_dict = {"at_str": link_text.split('@')[-1]}
-            d_val["actor_login"] = actor_login
             d_val["actor_id"] = actor_id
-            d_val["objnt_prop_dict"] = objnt_prop_dict
+            d_val["actor_login"] = actor_login
+            d_val.update(objnt_prop_dict)
         else:
             pass  # should never be reached
     elif link_pattern_type == "Repo":
@@ -556,12 +536,12 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                     if actor_id:
                         nt = "Actor"
                         objnt_prop_dict = objnt_prop_dict or {}
-                        objnt_prop_dict["label"] = "Organization"
-                        objnt_prop_dict["org_login"] = actor_login
+                        objnt_prop_dict["actor_id"] = actor_id
+                        objnt_prop_dict["actor_login"] = actor_login
                         objnt_prop_dict["org_id"] = actor_id
-                        d_val["actor_login"] = actor_login
-                        d_val["actor_id"] = actor_id
-                        d_val["objnt_prop_dict"] = objnt_prop_dict
+                        objnt_prop_dict["org_login"] = actor_login
+                        objnt_prop_dict["label"] = "Organization"
+                        d_val.update(objnt_prop_dict)
             else:
                 repo_name = repo_name_pattern_substr
                 if repo_name.endswith(".git"):
@@ -570,14 +550,10 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                     repo_name = repo_name[:-1]
                 repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                     "repo_name") else d_record.get("repo_id")
-                if repo_id:
-                    objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name}
-                else:
-                    nt = "Obj"  # uncertain
-                    objnt_prop_dict = None
-                d_val["repo_name"] = repo_name
-                d_val["repo_id"] = repo_id
-                d_val["objnt_prop_dict"] = objnt_prop_dict
+                if not repo_id:
+                    nt = default_node_type  # uncertain
+                objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name}
+                d_val.update(objnt_prop_dict)
         else:
             pass  # should never be reached
     elif link_pattern_type == "Branch_Tag_GHDir":
@@ -607,9 +583,9 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                         d_val["tag_name"] = Branch_Tag_GHDir_name
                         objnt_prop_dict = {"tag_name": Branch_Tag_GHDir_name}
                     else:
-                        nt = "Obj"  # GitHub_Dir
-                        label = None
+                        nt = default_node_type  # GitHub_Dir
                         objnt_prop_dict = {}
+                        label = None
                         if "#" in Branch_Tag_GHDir_name:
                             label = "Text_Locator"
                         elif "/" in Branch_Tag_GHDir_name:
@@ -617,12 +593,11 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                         if label is not None:
                             objnt_prop_dict["label"] = label
             else:
-                nt = "Obj"  # repo_id repo_name仍保留
-                objnt_prop_dict = None
-
-            d_val["repo_name"] = repo_name
-            d_val["repo_id"] = repo_id
-            d_val["objnt_prop_dict"] = objnt_prop_dict
+                nt = default_node_type  # repo_id repo_name仍保留
+                objnt_prop_dict = {}
+            d_repo_info = {"repo_id": repo_id, "repo_name": repo_name}
+            objnt_prop_dict = dict(**d_repo_info, **objnt_prop_dict)
+            d_val.update(objnt_prop_dict)
         else:
             pass  # should never be reached
     elif link_pattern_type == "CommitComment":
@@ -632,12 +607,11 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                                                 link_text)
             repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                 "repo_name") else d_record.get("repo_id")
+            commit_comment_sha = get_first_match_or_none(r'[0-9a-fA-F]{40}(?=#commitcomment-)', link_text)
             commit_comment_id = get_first_match_or_none(r'(?<=#commitcomment-)\d+', link_text)
-            objnt_prop_dict = {"commit_comment_id": commit_comment_id}
-            d_val["repo_name"] = repo_name
-            d_val["repo_id"] = repo_id
-            d_val["commit_comment_id"] = commit_comment_id
-            d_val["objnt_prop_dict"] = objnt_prop_dict
+            objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "commit_comment_sha": commit_comment_sha,
+                               "commit_comment_id": commit_comment_id}
+            d_val.update(objnt_prop_dict)
         else:
             pass  # should never be reached
     elif link_pattern_type == "Gollum":
@@ -647,10 +621,8 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                 r'(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*(?=/wiki)', link_text)
             repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                 "repo_name") else d_record.get("repo_id")
-            objnt_prop_dict = None
-            d_val["repo_name"] = repo_name
-            d_val["repo_id"] = repo_id
-            d_val["objnt_prop_dict"] = objnt_prop_dict
+            objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name}
+            d_val.update(objnt_prop_dict)
         else:
             pass  # should never be reached
     elif link_pattern_type == "Release":
@@ -687,26 +659,23 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                             tag_name = release_tag_name_url_dec
                     release_id = None
                     release_tag_name = None
-                    d_val["tag_name"] = tag_name
                     objnt_prop_dict = {"tag_name": tag_name, "tag_query_status": tag_query_status}
-            if tag_query_status is None:
+            if nt == "Release":
                 objnt_prop_dict = {"release_id": release_id, "release_tag_name": release_tag_name}
-            d_val["repo_name"] = repo_name
-            d_val["repo_id"] = repo_id
-            d_val["release_id"] = release_id
-            d_val["release_tag_name"] = release_tag_name
-            d_val["objnt_prop_dict"] = objnt_prop_dict
+            d_repo_info = {"repo_id": repo_id, "repo_name": repo_name}
+            objnt_prop_dict = dict(**d_repo_info, **objnt_prop_dict)
+            d_val.update(objnt_prop_dict)
         else:
             pass  # should never be reached
     elif link_pattern_type == "GitHub_Files_FileChanges":
-        nt = "Obj"
+        nt = default_node_type
         repo_name = get_first_match_or_none(r'(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*', link_text)
         repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get("repo_name") else d_record.get(
             "repo_id")
-        d_val["repo_name"] = repo_name
-        d_val["repo_id"] = repo_id
+        objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name}
+        d_val.update(objnt_prop_dict)
     elif link_pattern_type == "GitHub_Other_Links":
-        nt = "Obj"
+        nt = default_node_type
         org_repo_name = get_first_match_or_none(r'(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*', link_text)
         org_repo_name = str(org_repo_name)
         if org_repo_name:
@@ -727,42 +696,33 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record):
                 if actor_id:
                     nt = "Actor"
                     objnt_prop_dict = objnt_prop_dict or {}
-                    objnt_prop_dict["label"] = "Organization"
-                    objnt_prop_dict["org_login"] = actor_login
+                    objnt_prop_dict["actor_id"] = actor_id
+                    objnt_prop_dict["actor_login"] = actor_login
                     objnt_prop_dict["org_id"] = actor_id
-                    d_val["actor_login"] = actor_login
-                    d_val["actor_id"] = actor_id
-                    d_val["objnt_prop_dict"] = objnt_prop_dict
+                    objnt_prop_dict["org_login"] = actor_login
+                    objnt_prop_dict["label"] = "Organization"
+                    d_val.update(objnt_prop_dict)
             if repo_name:
                 repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get("repo_name") else d_record.get(
                     "repo_id")
-                d_val["repo_name"] = repo_name
-                d_val["repo_id"] = repo_id
-                objnt_prop_dict["repo_name"] = repo_name
-                objnt_prop_dict["repo_id"] = repo_id
-
-            d_val["objnt_prop_dict"] = objnt_prop_dict
+                d_repo_info = {"repo_id": repo_id, "repo_name": repo_name}
+                objnt_prop_dict = dict(**d_repo_info, **objnt_prop_dict)
+                d_val.update(objnt_prop_dict)
     elif link_pattern_type == "GitHub_Other_Service":
-        nt = "Obj"
+        nt = default_node_type
+        # bot service
         actor_login = get_first_match_or_none(r"(?<=com/apps/)([A-Za-z0-9][-0-9a-zA-Z]*(?:\[bot\])?)(?![-A-Za-z0-9/])", link_text)
         actor_id = get_actor_id_by_actor_login(actor_login) if actor_login != d_record.get(
             "actor_login") else d_record.get("actor_id")
         if actor_id:
             nt = 'Actor'
             objnt_prop_dict = {"actor_id": actor_id, "actor_login": actor_login, "label": "Bot"}
-            d_val["actor_login"] = actor_login
-            d_val["actor_id"] = actor_id
-            d_val["objnt_prop_dict"] = objnt_prop_dict
+            d_val.update(objnt_prop_dict)
     elif link_pattern_type == "GitHub_Service_External_Links":
-        nt = "Obj"
+        nt = default_node_type
     else:
         pass  # should never be reached
 
-    if d_val.get("repo_id"):
-        objnt_prop_dict = {"repo_name": d_val.get("repo_name"), "repo_id": d_val.get("repo_id")}
-        d_extra_prop = d_val.get("objnt_prop_dict", None)
-        if d_extra_prop:
-            objnt_prop_dict.update(d_extra_prop)
     d_val["objnt_prop_dict"] = objnt_prop_dict
     if not isinstance(nt, str):
         print(f"The node type is {nt}! It will be parsed into {default_node_type} by default! You may need to check "

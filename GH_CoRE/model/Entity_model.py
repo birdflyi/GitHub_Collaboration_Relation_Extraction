@@ -12,6 +12,8 @@ import types
 
 import numpy as np
 
+from collections import Counter
+
 # __get_tag_commit_sha must be imported, see ER_config.event_trigger_ERE_triples_dict
 from GH_CoRE.model.Attribute_getter import _get_field_from_db, get_actor_id_by_actor_login, \
     get_repo_id_by_repo_full_name, __get_commit_parents_sha, __get_tag_commit_sha
@@ -19,13 +21,88 @@ from GH_CoRE.model.ER_config_parser import get_eventType_params_from_joined_str
 
 
 class Obj_exid:
+    """
+    exid_map patterns and cases:
+
+    Actor
+    actor_id
+
+    Branch
+    repo_id:branch_name
+
+    Commit
+    repo_id@commit_sha
+
+    CommitComment
+    repo_id@commit_sha#rcomment_id
+    e.g. https://api.github.com/repos/cockroachdb/cockroach/comments/5388856 has "commit_id": "ad8825724fa9ab5b4565e338e7274dccb42e5daf", commit_sha is hidden:
+    https://api.github.com/repos/cockroachdb/cockroach/commits/ad8825724fa9ab5b4565e338e7274dccb42e5daf/comments, commit_sha is nessary for query html: https://github.com/cockroachdb/cockroach/commit/ad8825724fa9ab5b4565e338e7274dccb42e5daf#r5388856
+
+    Gollum
+    repo_id:wiki
+
+    Issue
+    repo_id#issue_number
+
+    IssueComment
+    repo_id#issue_number#comment_id
+
+    PR
+    repo_id#issue_number
+
+    PRR
+    ~~repo_id#issue_number@commit_sha#review_id~~
+    repo_id#issue_number#prr-review_id
+    e.g. https://api.github.com/repos/cockroachdb/cockroach/pulls/135310/reviews/2439944307 has "commit_id": "27d4b63c01250719d6f709bfdceff4d14fe8cb4d",
+    commit_sha is optional for query html: https://github.com/cockroachdb/cockroach/pull/135310#pullrequestreview-2439944307
+
+    PRRC
+    ~~repo_id#issue_number@commit_sha#review_id#rcomment_id~~
+    repo_id#issue_number#rcomment_id
+    https://api.github.com/repos/cockroachdb/cockroach/pulls/comments/1220583001 has "pull_request_review_id": 1466347221 and "commit_id": "948ec1e56a6226b4e892247239484bb08fc3631d",
+    repo_id and (issue_number#discussion_rcomment_id or issue_number/files#rcomment_id or issue_number/files/commit_sha#rcomment_id or issue_number/commits/commit_sha#rcomment_id) is nessary for query html, and review_id isnot nessary for query html:
+    https://github.com/cockroachdb/cockroach/pull/104294#discussion_r1220583001,
+    https://github.com/cockroachdb/cockroach/pull/104294/files#r1220583001,
+    https://github.com/cockroachdb/cockroach/pull/104294/files/948ec1e56a6226b4e892247239484bb08fc3631d#r1220583001,
+    https://github.com/cockroachdb/cockroach/pull/104294/commits/948ec1e56a6226b4e892247239484bb08fc3631d#r1220583001
+    review_id can be null for unknown reason: https://api.github.com/repos/cockroachdb/cockroach/pulls/comments/9750744
+    the comment_id is unique in a specific repo_id#issue_number!
+
+    Push
+    repo_id.push_id
+
+    Release
+    repo_id-release_id
+
+    Repo
+    repo_id
+
+    Tag
+    repo_id-tag_name
+    """
     exid_map = {
+        # actor_id as General Index
         "branch_exid": "{repo_id}:{branch_name}",
+        "commit_exid": "{repo_id}@{commit_sha}",  # use the exid to distinguish from the SHA of other resources
+        "commit_comment_exid": "{repo_id}@{commit_sha}#r{comment_id}",
         "gollum_exid": "{repo_id}:wiki",
-        "issue_exid": "{repo_id}#{issue_number}",
-        "tag_exid": "{repo_id}@{tag_name}"
+        "issue_exid": "{repo_id}#{issue_number}",  # for Issue or PullRequest
+        "issue_comment_exid": "{repo_id}#{issue_number}#{comment_id}",
+
+        # "pull_request_review_exid": "{repo_id}#{issue_number}@{commit_sha}#{review_id}",
+        "pull_request_review_exid": "{repo_id}#{issue_number}#prr-{review_id}",
+
+        # "pull_request_review_comment_exid": "{repo_id}#{issue_number}@{commit_sha}#{review_id}#r{comment_id}",
+        "pull_request_review_comment_exid": "{repo_id}#{issue_number}#r{comment_id}",
+
+        "push_exid": "{repo_id}.{push_id}",
+        "release_exid": "{repo_id}-{release_id}",
+        # repo_id as General Index
+        "tag_exid": "{repo_id}-{tag_name}",
     }
-    exid_seps = [':', '#', '@']
+    # should beyond all the charactor of exid_string to escape
+    # "#r" should be placed after "#" to avoid being replaced with a more complex one
+    exid_seps = [':', '#', "#r", '@', '.', '-', '!', '|']
 
     @staticmethod
     def _match_exid_map_key(exid_map_key, match_conditon='endswith'):
@@ -59,7 +136,7 @@ class Obj_exid:
         return exid_string
 
     @staticmethod
-    def get_kwargs_from_exid(exid_map_key, exid_string, match_conditon='endswith'):
+    def get_kwargs_from_exid(exid_map_key, exid_string, match_conditon='endswith', escape_words=None):
         k_matched = Obj_exid._match_exid_map_key(exid_map_key, match_conditon)
         exid_template = Obj_exid.exid_map[k_matched]
 
@@ -81,6 +158,8 @@ class Obj_exid:
 
         keys = [k.strip("{}") for k in exid_template_prepared.split(temp_sep) if k.strip("{}")]
         values = exid_string_prepared.split(temp_sep)
+        if isinstance(escape_words, list):
+            values = [v for v in values if v not in escape_words]
 
         exid_kwargs = None
         if len(keys) <= len(values):
@@ -99,8 +178,8 @@ class Obj_exid:
                         ambiguous_pattern = True
                     d_sep_first_indexes[sep] = sep_first_index
                 if ambiguous_pattern:
-                    print(f"Find ambiguous sep pattern in {exid_template} using the same separator multi-times, which "
-                          f"may cause wrong parse result when execute get_kwargs_from_exid! "
+                    print(f"Warning: Find ambiguous sep pattern in {exid_template} using the same separator multi-times,"
+                          f" which may cause wrong parse result when execute get_kwargs_from_exid! "
                           f"Please change the exid_template in Obj_exid.exid_map and Obj_exid.exid_seps.")
                 d_sep_first_indexes_sorted_by_val = sorted(d_sep_first_indexes.items(), key=lambda x: x[1])
                 d_sep_first_indexes_sorted_by_val = dict(d_sep_first_indexes_sorted_by_val)
@@ -110,7 +189,7 @@ class Obj_exid:
                     if ind >= 0:
                         v_str, curr_raw_str = curr_raw_str.split(sep, 1)
                         values.append(v_str)
-                values.append(curr_raw_str)
+                values.append(curr_raw_str)  # Add the substring left over from the last loop
                 if len(values) < len(keys):
                     values += [''] * (len(keys) - len(values))
                 values = values[:len(keys)]
@@ -139,6 +218,8 @@ def _trim_refs_heads(ref_str: str):  # see ER_config.event_trigger_ERE_triples_d
 # 实体型Entity Type：E(U, D, F)，其中E为实体名，U为组成该实体概念的属性名集合，D为属性组U中属性所来自的域，F为属性间数据的依赖关系集合。
 class ObjEntity(object):
     nt_label_delimiter = "::"
+    default_type = "Object"
+    default_type_abbr = "OBJ"
     E = {
         'Actor': {
             'U_K': {'actor_id(PK)', 'actor_login'},  # Not None: any
@@ -147,6 +228,7 @@ class ObjEntity(object):
             'F': {'actor_id': lambda actor_login: get_actor_id_by_actor_login(actor_login),  # execute when actor_id is missing
                   'actor_login': lambda actor_id: _get_field_from_db('actor_login', {'actor_id': actor_id}),
                   },
+            'ABBR': 'A',
         },
         'Branch': {
             'U_K': {'_branch_exid(PK)', 'repo_id', 'branch_name'},
@@ -160,33 +242,38 @@ class ObjEntity(object):
                   'branch_name': lambda _branch_exid: Obj_exid.get_kwargs_from_exid('_branch_exid', _branch_exid)[
                       'branch_name'],
                   },
+            'ABBR': 'B',
         },
         'Commit': {
-            'U_K': {'commit_sha(PK)', 'repo_id', '_commit_author_id', '__commit_parents_sha'},
+            'U_K': {'_commit_exid(PK)', 'repo_id', 'commit_sha', '_commit_author_id', '__commit_parents_sha'},
             # Not None: ['commit_sha']
             'U_V': {'push_commits.message', 'push_commits.name', 'push_commits.email'},
-            'D': {'commit_sha(PK)': str, 'repo_id': int, '_commit_author_id': int, '__commit_parents_sha': list,
+            'D': {'_commit_exid(PK)': str, 'repo_id': int, 'commit_sha': str, '_commit_author_id': int, '__commit_parents_sha': list,
                   'push_commits.message': str, 'push_commits.name': str, 'push_commits.email': str},
             # __commit_parents_sha示例：getJson(https://api.github.com/repos/tidyverse/ggplot2/commits/8041c84bf958285fa16301204ac464422373e589).parents.[i].sha
-            'F': {'_commit_author_id': lambda commit_sha, type=None, actor_id=None: actor_id if type == 'PushEvent' and ObjEntity.val_not_na(actor_id) else _get_field_from_db('actor_id', {'type': 'PushEvent', 'push_head': commit_sha}),
+            'F': {'_commit_exid': lambda repo_id, commit_sha: Obj_exid.get_exid('_commit_exid', {"repo_id": repo_id, "commit_sha": commit_sha}),
+                  '_commit_author_id': lambda commit_sha, type=None, actor_id=None: actor_id if type == 'PushEvent' and ObjEntity.val_not_na(actor_id) else _get_field_from_db('actor_id', {'type': 'PushEvent', 'push_head': commit_sha}),
                   'repo_id': lambda commit_sha: _get_field_from_db('repo_id', {'type': 'PushEvent', 'push_head': commit_sha}),
                   '__commit_parents_sha': lambda commit_sha, repo_id: __get_commit_parents_sha(commit_sha, repo_id),
                   'push_commits.message': lambda commit_sha: _get_field_from_db('push_commits.message', {'type': 'PushEvent', 'push_head': commit_sha}),
                   'push_commits.name': lambda commit_sha: _get_field_from_db('push_commits.name', {'type': 'PushEvent', 'push_head': commit_sha}),
                   'push_commits.email': lambda commit_sha: _get_field_from_db('push_commits.email', {'type': 'PushEvent', 'push_head': commit_sha}),
                   },
+            'ABBR': 'C',
         },
         'CommitComment': {
-            'U_K': {'commit_comment_id(PK)', 'commit_comment_author_id', 'commit_comment_sha'},
+            'U_K': {'_commit_comment_exid(PK)', 'repo_id', 'commit_comment_sha', 'commit_comment_id', 'commit_comment_author_id'},
             # Not None: ['commit_comment_id']
             'U_V': {'body', 'commit_comment_path'},  # regard 'commit_comment_path' as unknown NE
-            'D': {'commit_comment_id(PK)': int, 'commit_comment_author_id': int, 'commit_comment_sha': str,
+            'D': {'_commit_comment_exid(PK)': str, 'repo_id': int, 'commit_comment_sha': str, 'commit_comment_id': int, 'commit_comment_author_id': int,
                   'body': str, 'commit_comment_path': str},
-            'F': {'body': lambda commit_comment_id: _get_field_from_db('body', {'type': 'CommitCommentEvent',
+            'F': {'_commit_comment_exid': lambda repo_id, commit_comment_sha, commit_comment_id: Obj_exid.get_exid('_commit_comment_exid', {"repo_id": repo_id, "commit_sha": commit_comment_sha, "comment_id": commit_comment_id}),
+                  'body': lambda commit_comment_id: _get_field_from_db('body', {'type': 'CommitCommentEvent',
                                                                                 'commit_comment_id': commit_comment_id}),
                   'commit_comment_path': lambda commit_comment_id: _get_field_from_db('commit_comment_path', {'type': 'CommitCommentEvent',
                                                                                 'commit_comment_id': commit_comment_id})
                   },
+            'ABBR': 'CC',
         },
         'Gollum': {
             'U_K': {'_gollum_exid(PK)', 'repo_id'},  # Not None: ['repo_id']
@@ -196,12 +283,13 @@ class ObjEntity(object):
                   'repo_id': lambda _gollum_exid: Obj_exid.get_kwargs_from_exid('_gollum_exid', _gollum_exid)[
                       'repo_id'],
                   },
+            'ABBR': 'G',
         },
         'Issue': {
-            'U_K': {'_issue_exid(PK)', 'issue_id', 'repo_id', 'issue_number', 'issue_author_id'},
+            'U_K': {'_issue_exid(PK)', 'repo_id', 'issue_id', 'issue_number', 'issue_author_id'},
             # Not None: ['repo_id', 'issue_number']
             'U_V': {'issue_title', 'body'},
-            'D': {'_issue_exid(PK)': str, 'issue_id': int, 'repo_id': int, 'issue_number': int, 'issue_author_id': int,
+            'D': {'_issue_exid(PK)': str, 'repo_id': int, 'issue_id': int, 'issue_number': int, 'issue_author_id': int,
                   'issue_title': str, 'body': str},
             'F': {'_issue_exid': lambda repo_id, issue_number: Obj_exid.get_exid('_issue_exid', {"repo_id": repo_id,
                                                                                                  "issue_number": issue_number}),
@@ -215,18 +303,21 @@ class ObjEntity(object):
                                                                            {'type': 'IssuesEvent', 'repo_id': repo_id,
                                                                             'issue_number': issue_number})
                   },
+            'ABBR': 'I',
         },
         'IssueComment': {
-            'U_K': {'issue_comment_id(PK)', '_issue_exid', 'repo_id', 'issue_number', 'issue_comment_author_id'},
+            'U_K': {'_issue_comment_exid(PK)', 'repo_id', 'issue_number', '_issue_exid', 'issue_comment_id', 'issue_comment_author_id'},
             # Not None: ['issue_comment_id']
             'U_V': {'body'},
-            'D': {'issue_comment_id(PK)': int, '_issue_exid': str, 'repo_id': int, 'issue_number': int,
+            'D': {'_issue_comment_exid(PK)': str, 'repo_id': int, 'issue_number': int, '_issue_exid': str, 'issue_comment_id': int,
                   'issue_comment_author_id': int, 'body': str},
-            'F': {'_issue_exid': lambda repo_id, issue_number: Obj_exid.get_exid('_issue_exid', {"repo_id": repo_id,
+            'F': {'_issue_comment_exid': lambda repo_id, issue_number, issue_comment_id: Obj_exid.get_exid('_issue_comment_exid', {"repo_id": repo_id, "issue_number": issue_number, "comment_id": issue_comment_id}),
+                  '_issue_exid': lambda repo_id, issue_number: Obj_exid.get_exid('_issue_exid', {"repo_id": repo_id,
                                                                                                  "issue_number": issue_number}),
                   'body': lambda issue_comment_id: _get_field_from_db('body', {'type': 'IssueCommentEvent',
                                                                                'issue_comment_id': issue_comment_id})
                   },
+            'ABBR': 'IC',
         },
         'PullRequest': {
             'U_K': {'_issue_exid(PK)', 'issue_id', 'repo_id', 'issue_number', 'issue_author_id',
@@ -258,32 +349,35 @@ class ObjEntity(object):
                                                                             'repo_id': repo_id,
                                                                             'issue_number': issue_number})
                   },
+            'ABBR': 'PR',
         },
         'PullRequestReview': {
-            'U_K': {'pull_review_id(PK)', '_issue_exid', 'repo_id', 'issue_id', 'issue_number',
-                    'pull_requested_reviewer_id', '_pull_head_branch_exid', 'pull_head_repo_id',
-                    'pull_head_ref'},  # Not None: ['pull_review_id']
+            'U_K': {'_pull_request_review_exid(PK)', 'repo_id', 'issue_id', 'issue_number', '_issue_exid', 'pull_merge_commit_sha', 'pull_review_id',
+                    'pull_requested_reviewer_id', '_pull_head_branch_exid', 'pull_head_repo_id', 'pull_head_ref'},  # Not None: ['pull_review_id']
             'U_V': {'body'},
-            'D': {'pull_review_id(PK)': int, '_issue_exid': str, 'repo_id': int, 'issue_id': int, 'issue_number': int,
-                  'pull_requested_reviewer_id': int,
-                  '_pull_head_branch_exid': str, 'pull_head_repo_id': int, 'pull_head_ref': str, 'body': str},
-            'F': {'_issue_exid': lambda repo_id, issue_number: Obj_exid.get_exid('_issue_exid', {"repo_id": repo_id,
+            'D': {'_pull_request_review_exid(PK)': str, 'repo_id': int, 'issue_id': int, 'issue_number': int, '_issue_exid': str, 'pull_merge_commit_sha': str, 'pull_review_id': int,
+                  'pull_requested_reviewer_id': int, '_pull_head_branch_exid': str, 'pull_head_repo_id': int, 'pull_head_ref': str, 'body': str},
+            'F': {'_pull_request_review_exid': lambda repo_id, issue_number, pull_merge_commit_sha, pull_review_id: Obj_exid.get_exid(
+                '_pull_request_review_exid', {"repo_id": repo_id, "issue_number": issue_number, "commit_sha": pull_merge_commit_sha, "review_id": pull_review_id}),
+                  '_issue_exid': lambda repo_id, issue_number: Obj_exid.get_exid('_issue_exid', {"repo_id": repo_id,
                                                                                                  "issue_number": issue_number}),
                   '_pull_head_branch_exid': lambda pull_head_repo_id, pull_head_ref: Obj_exid.get_exid(
                       '_pull_head_branch_exid', {"repo_id": pull_head_repo_id, "branch_name": pull_head_ref}),
                   'body': lambda pull_review_id: _get_field_from_db('body', {'type': 'PullRequestReviewEvent',
                                                                              'pull_review_id': pull_review_id})
-                  }
+                  },
+            'ABBR': 'PRR',
         },
         'PullRequestReviewComment': {
-            'U_K': {'pull_review_comment_id(PK)', '_issue_exid', 'repo_id', 'issue_id', 'issue_number',
-                    'pull_review_id', 'pull_review_comment_author_id',
-                    'push_head'},  # Not None: ['pull_review_comment_id']
+            'U_K': {'_pull_request_review_comment_exid(PK)', 'repo_id', 'issue_id', 'issue_number', '_issue_exid', 'pull_merge_commit_sha', 'pull_review_id', 'pull_review_comment_id',
+                    'pull_review_comment_author_id', 'push_head'},  # Not None: ['pull_review_comment_id']
             'U_V': {'body', 'pull_review_comment_path'},  # regard 'pull_review_comment_path' as unknown NE
-            'D': {'pull_review_comment_id(PK)': int, '_issue_exid': str, 'repo_id': int, 'issue_id': int,
-                  'issue_number': int, 'pull_review_id': int,
+            'D': {'_pull_request_review_comment_exid(PK)': str, 'repo_id': int, 'issue_id': int,
+                  'issue_number': int, '_issue_exid': str, 'pull_merge_commit_sha': str, 'pull_review_id': int,  'pull_review_comment_id': int,
                   'pull_review_comment_author_id': int, 'push_head': str, 'body': str, 'pull_review_comment_path': str},
-            'F': {'_issue_exid': lambda repo_id, issue_number: Obj_exid.get_exid('_issue_exid', {"repo_id": repo_id,
+            'F': {'_pull_request_review_comment_exid': lambda repo_id, issue_number, pull_merge_commit_sha, pull_review_id, pull_review_comment_id: Obj_exid.get_exid(
+                '_pull_request_review_comment_exid', {"repo_id": repo_id, "issue_number": issue_number, "commit_sha": pull_merge_commit_sha, "review_id": pull_review_id, "comment_id": pull_review_comment_id}),
+                '_issue_exid': lambda repo_id, issue_number: Obj_exid.get_exid('_issue_exid', {"repo_id": repo_id,
                                                                                                  "issue_number": issue_number}),
                   'body': lambda pull_review_comment_id: _get_field_from_db('body',
                                                                             {'type': 'PullRequestReviewCommentEvent',
@@ -292,30 +386,35 @@ class ObjEntity(object):
                                                                             {'type': 'PullRequestReviewCommentEvent',
                                                                              'pull_review_comment_id': pull_review_comment_id})
                   },
+            'ABBR': 'PRRC',
         },
         'Push': {
-            'U_K': {'push_id(PK)', 'actor_id', '_push_branch_exid', 'repo_id', 'push_ref', 'push_head'},
+            'U_K': {'_push_exid(PK)', 'repo_id', 'push_id', 'actor_id', '_push_branch_exid', 'push_ref', 'push_head'},
             # Not None: ['push_id']
             'U_V': None,
-            'D': {'push_id(PK)': int, 'actor_id': int, '_push_branch_exid': str, 'repo_id': int, 'push_ref': str,
+            'D': {'_push_exid(PK)': str, 'repo_id': int, 'push_id': int, 'actor_id': int, '_push_branch_exid': str, 'push_ref': str,
                   'push_head': str},
-            'F': {'_push_branch_exid': lambda repo_id, push_ref: Obj_exid.get_exid('_push_branch_exid',
+            'F': {'_push_exid': lambda repo_id, push_id: Obj_exid.get_exid('_push_exid', {"repo_id": repo_id, "push_id": push_id}),
+                  '_push_branch_exid': lambda repo_id, push_ref: Obj_exid.get_exid('_push_branch_exid',
                                                                                    {"repo_id": repo_id,
                                                                                     "branch_name": _trim_refs_heads(
-                                                                                        push_ref)})}
+                                                                                        push_ref)})},
+            'ABBR': 'P',
         },
         'Release': {
-            'U_K': {'release_id(PK)', 'release_author_id', '_release_tag_exid', 'repo_id', 'release_tag_name',
-                    'release_name'},  # Not None: ['release_id']
+            'U_K': {'_release_exid(PK)', 'repo_id', 'release_id', 'release_tag_name', 'release_name',
+                    '_release_tag_exid', 'release_author_id'},  # Not None: ['release_id']
             'U_V': {'release_body'},
-            'D': {'release_id(PK)': int, 'release_author_id': int, '_release_tag_exid': str, 'repo_id': int,
-                  'release_tag_name': str, 'release_name': str, 'release_body': str},
-            'F': {'_release_tag_exid': lambda repo_id, release_tag_name: Obj_exid.get_exid('_release_tag_exid',
+            'D': {'_release_exid(PK)': str, 'repo_id': int, 'release_id': int, 'release_tag_name': str, 'release_name': str,
+                  '_release_tag_exid': str, 'release_author_id': int, 'release_body': str},
+            'F': {'_release_exid': lambda repo_id, release_id: Obj_exid.get_exid('_release_exid', {"repo_id": repo_id, "release_id": release_id}),
+                  '_release_tag_exid': lambda repo_id, release_tag_name: Obj_exid.get_exid('_release_tag_exid',
                                                                                            {"repo_id": repo_id,
                                                                                             "tag_name": release_tag_name}),
                   'release_body': lambda release_id: _get_field_from_db('release_body', {'type': 'ReleaseEvent',
                                                                                          'release_id': release_id})
                   },
+            'ABBR': 'RE',
         },
         'Repo': {
             'U_K': {'repo_id(PK)', '_repo_full_name', 'repo_name', '_owner_id', '_name', 'org_id'},
@@ -330,6 +429,7 @@ class ObjEntity(object):
                   '_name': lambda repo_name: repo_name.split('/')[1],
                   'repo_description': lambda repo_id: _get_field_from_db('repo_description', {'type': 'PullRequestEvent', 'repo_id': repo_id}),
             },
+            'ABBR': 'R',
         },
         'Tag': {
             'U_K': {'_tag_exid(PK)', 'repo_id', 'tag_name', '_tag_branch_exid', 'tag_branch_name'},
@@ -348,7 +448,14 @@ class ObjEntity(object):
                   # 'tag_branch_name': case(type, [CreateEvent, DeleteEvent, ReleaseEvent], [create_master_branch, None, release_target_commitish]),
                   # '_tag_commit_sha': lambda repo_id, tag_name: __get_tag_commit_sha(repo_id, tag_name)  # 此关系被定义为Tag向Commit的依赖关系，这里不再重复查询
                   },
+            'ABBR': 'T',
         },
+        'Object': {
+            'ABBR': 'OBJ',
+        },
+        'None': {
+            'ABBR': 'NONE',
+        }
     }
 
     def __init__(self, entity_type: str, init_mode='build_id', U_init_scope: list = None):
@@ -358,6 +465,8 @@ class ObjEntity(object):
             raise ValueError("init_mode must be in ['build_id', 'query_other_fileds_in_F_by_id', 'build_all_fields']!")
         self._init_mode = init_mode
         self.__entity_def = dict(ObjEntity.E.get(self.__type__, {}))
+        self._type_abbr_map = ObjEntity.validate_type_abbr(ret_bool=False)
+        self._type_abbr = self.__entity_def.get("ABBR", self.default_type_abbr)
         self._U_init_scope = U_init_scope or ['U_K']  # set ['U_K', 'U_V'] to query clickhouse to get all body values.
         temp_field_set_list = [self.__entity_def.get(k, set()) for k in self._U_init_scope]
         self._U_fields = set.union(*temp_field_set_list)
@@ -440,6 +549,22 @@ class ObjEntity(object):
                 flag = flag and isinstance(self.__dict__.get(p, None), entity_type_def_ext)
         return flag
 
+    @staticmethod
+    def validate_type_abbr(ret_bool=True):
+        ks = []
+        vs = []
+        for k_ent_type, d_v_ent_def in ObjEntity.E.items():
+            ks.append(k_ent_type)
+            vs.append(d_v_ent_def.get("ABBR", ObjEntity.default_type_abbr))
+        type_abbr_map = dict(zip(ks, vs))
+        counts = Counter(vs)
+        # 找出有重复值的key
+        duplicate_keys = [key for key, value in type_abbr_map.items() if counts[value] > 1]
+        if len(duplicate_keys):
+            raise ValueError(f"Duplicate ABBR values in the definition of {duplicate_keys} in ObjEntity.E!")
+        ret = True if ret_bool else type_abbr_map
+        return ret
+
     def validate_PK(self):
         PK_value = getattr(self, self.__PK__, None)
         return PK_value is not None
@@ -482,12 +607,22 @@ class ObjEntity(object):
             msg = str(e) + f" for {self}!"
             raise AttributeError(msg)
 
-    def __repr__(self):
+    def __repr__(self, brief=True):
         if self.__PK__ is None:
-            repr_format = f"{self.__type__}{self.get_dict()}"
+            if brief:
+                repr_format = f"{self._type_abbr}_NOID"
+            else:
+                repr_format = f"{self.__type__}:{self.get_dict()}"
         else:
-            repr_format = f"{self.__type__}_{getattr(self, self.__PK__)}"
+            if brief:
+                repr_format = f"{self._type_abbr}_{getattr(self, self.__PK__)}"
+            else:
+                repr_format = f"{self.__type__}:{self.get_dict()}"
         return repr_format
+
+    @staticmethod
+    def get_exid_from_obj_repr(obj_repr: str, prefix_delimiter='_', maxsplit=1):
+        return obj_repr.split(prefix_delimiter, maxsplit)[-1]
 
 
 if __name__ == '__main__':
@@ -495,7 +630,7 @@ if __name__ == '__main__':
 
     tag_exid = Obj_exid.get_exid('_release_tag_exid', {"repo_id": 16563587, "tag_name": "@cockroachlabs/cluster-ui@24.3.2"})
     print(tag_exid)
-    tag_exid_params = Obj_exid.get_kwargs_from_exid("_release_tag_exid", "16563587@@cockroachlabs/cluster-ui@24.3.2")
+    tag_exid_params = Obj_exid.get_kwargs_from_exid("_release_tag_exid", "16563587:@cockroachlabs/cluster-ui@24.3.2")
     print(tag_exid_params)
 
     Branch = ObjEntity("Branch")
@@ -506,6 +641,8 @@ if __name__ == '__main__':
     Branch.set_val(d_val)
     print(Branch.validate_PK())
     print(Branch.get_dict())
+    print(Branch)
+    print(Branch.__repr__(False))
 
     Branch = ObjEntity("Branch", init_mode='build_all_fields')
     print(Branch.__dict__)

@@ -334,8 +334,7 @@ def __get_commit_parents_sha(commit_sha, repo_id=None, repo_full_name=None):
 
 
 def __get_tag_commit_sha(_tag_exid, repo_full_name=None):  # 示例：https://api.github.com/repos/spree/spree/tags {"name": "v4.7.1", "commit_sha": "bcbf8f28ed189124b1c2e4cf700f170c36e84c85"}
-    repo_id = _tag_exid.split('@')[0]
-    tag_name = _tag_exid.split('@')[1]
+    repo_id, tag_name = _tag_exid.split('-', 1)
     if not repo_full_name:
         url_params = {
             "repo_id": repo_id
@@ -453,6 +452,6 @@ if __name__ == '__main__':
     sha_res = [
         __get_PR_commits_sha_by_issue_exid("288431943#1292"),
         __get_commit_parents_sha("e5b25fba712a6d675fbf8328ef44ae0e1a8e377e", 288431943),
-        __get_tag_commit_sha(_tag_exid="3314@v4.7.1", repo_full_name="spree/spree"),
+        __get_tag_commit_sha(_tag_exid="3314-v4.7.1", repo_full_name="spree/spree"),
     ]
     print(sha_res)

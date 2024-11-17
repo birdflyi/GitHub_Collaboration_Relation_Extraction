@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
     # Download sample data
     year = 2023
-    repo_names = ["apache/lucene-solr", "TuGraph-family/tugraph-db", "facebook/rocksdb", "cockroachdb/cockroach"][0:1]
+    repo_names = ["apache/lucene-solr", "TuGraph-family/tugraph-db", "facebook/rocksdb", "cockroachdb/cockroach"][1:2]
 
     dbms_repos_raw_content_dir = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR], 'repos')
     if repo_names:

@@ -141,7 +141,7 @@ def get_obj_collaboration_tuples_from_record(record, extract_mode=3, cache=None)
                                 new_record_cached = cache.find_record_in_cache(feature_new_rec)
                                 if new_record_cached:
                                     # print(f"find new record in cache: {new_record_cached}")
-                                    obj_nt_from_body = dict(new_record_cached).get("obj_nt_from_body", ObjEntity("Obj"))
+                                    obj_nt_from_body = dict(new_record_cached).get("obj_nt_from_body", ObjEntity(ObjEntity.default_type))
                                 else:
                                     obj_nt_from_body = get_ent_obj_in_link_text(link_pattern_type, link_text, d_record)
                                     new_record = dict(**feature_new_rec, **{"obj_nt_from_body": obj_nt_from_body})
@@ -180,9 +180,9 @@ def get_df_collaboration(obj_collaboration_tuple_list, extend_field=True):
     for obj_collaboration_tuple in obj_collaboration_tuple_list:
         src_entity, tar_entity, relation, event = obj_collaboration_tuple[:4]
         new_row = {
-            "src_entity_id": getattr(src_entity, src_entity.__PK__, None) if src_entity.__PK__ else None,
+            "src_entity_id": src_entity.__repr__(brief=True) if src_entity.__PK__ else None,
             "src_entity_type": src_entity.__type__,
-            "tar_entity_id": getattr(tar_entity, tar_entity.__PK__, None) if tar_entity.__PK__ else None,
+            "tar_entity_id": tar_entity.__repr__(brief=True) if tar_entity.__PK__ else None,
             "tar_entity_type": tar_entity.__type__,
             "relation_label_id": relation.relation_label_id, "relation_type": relation.relation_type,
             "relation_label_repr": relation.relation_label_repr,
