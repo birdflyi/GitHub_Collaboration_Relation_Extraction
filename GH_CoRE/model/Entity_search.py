@@ -114,7 +114,7 @@ def __get_ref_name_exists_flag_by_repo_name(ref_name, repo_name, query_node_type
     query = df_query[df_query["query_node_types"] == query_node_type]["query_statements"].values[0]
     variables = df_query[df_query["query_node_types"] == query_node_type]["variables"].values[0]
     query_graphql_api = GitHubGraphQLAPI()
-    response = query_graphql_api.request(query, params=variables)
+    response = query_graphql_api.request(query, variables=variables)
     data = response.json()
     get_ref_dict = lambda data: data["data"]["repository"]["ref"]
     try:
@@ -263,6 +263,29 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
             issue_comment_id = get_first_match_or_none(r'(?<=#issuecomment-)\d+', link_text)
             objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "issue_number": issue_number, 'issue_comment_id': issue_comment_id}
             d_val.update(objnt_prop_dict)
+        elif re.search(r"#ref-commit-[a-zA-Z0-9]{7,40}", link_text):
+            nt = "Commit"
+            # 'https://github.com/cockroachdb/cockroach/pull/107417#ref-commit-f147c2b',
+            repo_name = get_first_match_or_none(
+                r'(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*(?=(?=/issues)|(?=/pull))', link_text)
+            repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
+                "repo_name") else d_record.get("repo_id")
+            issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
+            commit_sha = get_first_match_or_none(r'(?<=#ref-commit-)[0-9a-fA-F]{7,40}', link_text)
+            temp_objnt_prop_dict = {}
+            if commit_sha:
+                if len(commit_sha) < 40:
+                    temp_objnt_prop_dict = {"sha_abbr_7": commit_sha}
+                else:
+                    temp_objnt_prop_dict = {"commit_sha": commit_sha}
+                requestGitHubAPI = RequestGitHubAPI(url_pat_mode='id')
+                get_commit_url = requestGitHubAPI.get_url("commit", params={"repo_id": repo_id, "commit_sha": commit_sha})
+                response = requestGitHubAPI.request(get_commit_url)
+                if response:
+                    commit_sha = response.json().get('sha', None)
+                temp_objnt_prop_dict["commit_sha"] = commit_sha
+            objnt_prop_dict = dict(**{"repo_id": repo_id, "repo_name": repo_name, "issue_number": issue_number}, **temp_objnt_prop_dict)
+            d_val.update(objnt_prop_dict)
         elif re.search(r"/pull/\d+(?![\d#/])", link_text) or re.search(r"/pull/\d+#[-_0-9a-zA-Z\.%#/:]+-\d+(?![\d/])", link_text):
             nt = "PullRequest"
             # https://github.com/redis/redis/pull/10587#event-6444202459
@@ -272,7 +295,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
                 "repo_name") else d_record.get("repo_id")
             issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
             issue_elemName_elemIds = get_first_match_or_none(r'(?<=#)[-_0-9a-zA-Z\.%#/:]+-\d+', link_text)
-            objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name,"issue_number": issue_number}
+            objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "issue_number": issue_number}
             if issue_elemName_elemIds:
                 try:
                     issue_elemName_elemId = issue_elemName_elemIds[0]
@@ -359,8 +382,22 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
             d_val['repo_name'] = repo_name
             d_val['issue_number'] = issue_number
             d_val.update(objnt_prop_dict)
-        else:  # should never be reached
-            pass
+        else:
+            nt = default_node_type
+            repo_name = get_first_match_or_none(
+                r'(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*(?=(?=/issues)|(?=/pull))', link_text)
+            repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
+                "repo_name") else d_record.get("repo_id")
+            objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name}
+            issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
+            if issue_number is not None:
+                objnt_prop_dict.update({"issue_number": issue_number})
+            else:
+                objnt_prop_dict.update({"numbers": re.findall(r"(?<=#)\d+", link_text)})
+            d_val['repo_id'] = repo_id
+            d_val['repo_name'] = repo_name
+            d_val['issue_number'] = issue_number
+            d_val.update(objnt_prop_dict)
     elif link_pattern_type == "SHA":
         if re.search(r"/commits?/[0-9a-fA-F]{40}$", link_text):
             nt = "Commit"
@@ -804,6 +841,8 @@ if __name__ == '__main__':
     # link_text = '\n'.join([e_i for e in d_link_text.values() for e_i in e]) + temp_link_text
     # print(re.findall(re_ref_patterns["Issue_PR"][0], link_text))
     link_text = """
+    adityamaru@gmail.com
+    https://github.com/cockroachdb/cockroach/pull/107417#ref-commit-f147c2b
     http://127.0.0.1:7001]
     @dnz
     https://github.com/orgs/cockroachdb

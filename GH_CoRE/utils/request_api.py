@@ -7,9 +7,12 @@
 # @File   : request_api.py 
 
 import random
+from functools import partial
+
 import requests
 import time
 
+from GH_CoRE.utils.cache import QueryCache
 
 GITHUB_TOKENS = ['GITHUB_TOKEN_1', 'GITHUB_TOKEN_2']
 
@@ -123,7 +126,10 @@ class GitHubTokenPool:
         for tokenState in self.tokenState_list:
             if tokenState['remaining'] > 0:
                 return tokenState['token']
-            if self.minTime_tokenState['reset'] > tokenState['reset']:
+
+        self.minTime_tokenState = None
+        for tokenState in self.tokenState_list:
+            if self.minTime_tokenState is None or self.minTime_tokenState['reset'] > tokenState['reset']:
                 self.minTime_tokenState = tokenState
 
         sleep_time = int(self.minTime_tokenState['reset'] - time.time())
@@ -163,10 +169,12 @@ class RequestGitHubAPI(RequestAPI):
     }
     default_method = 'GET'
     url_pat_mode = 'name'
+    cache = QueryCache(max_size=200)
 
     def __init__(self, url_pat_mode=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__dict__.update(**kwargs)
+        self.cache = self.__class__.cache
         self.token_pool = kwargs.get("token_pool", None) or self.__class__.token_pool
         self.url_pat_mode = url_pat_mode or self.__class__.url_pat_mode
         if self.url_pat_mode == 'id':
@@ -197,11 +205,20 @@ class RequestGitHubAPI(RequestAPI):
 
     def request(self, url, method=None, retry=1, default_break=60, query=None, **kwargs):
         url = url or self.base_url
-        self.token = self.token_pool.get_GithubToken()
-        self.update_headers()
-        response = RequestAPI.request(self, url=url, method=method, retry=retry, default_break=default_break,
-                                      query=query, **kwargs)
-        self.token_pool.update_GithubTokenState_list(self.token, response)
+        self.cache.match_func = partial(QueryCache.d_match_func, **{"feat_keys": kwargs.get("feat_keys", None) or
+                                                                                 ["url", "method", "query"]})
+        feature_new_rec = {"url": url, "method": method, "query": query}
+        record_info_cached = self.cache.find_record_in_cache(feature_new_rec)
+        if record_info_cached:
+            response = dict(record_info_cached).get("response", None)
+        else:
+            self.token = self.token_pool.get_GithubToken()
+            self.update_headers()
+            response = RequestAPI.request(self, url=url, method=method, retry=retry, default_break=default_break,
+                                          query=query, **kwargs)
+            self.token_pool.update_GithubTokenState_list(self.token, response)
+        new_record = dict(**feature_new_rec, **{"response": response})
+        self.cache.add_record(new_record)
         return response
 
 
@@ -215,19 +232,30 @@ class GitHubGraphQLAPI(RequestAPI):
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.4; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2225.0 Safari/537.36'
     }
     default_method = 'POST'
+    cache = QueryCache(max_size=200)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__dict__.update(**kwargs)
+        self.cache = self.__class__.cache
         self.token_pool = kwargs.get("token_pool", None) or self.__class__.token_pool
 
     def request(self, query, url=None, method=None, retry=1, default_break=60, **kwargs):
         url = url or self.base_url
-        self.token = self.token_pool.get_GithubToken()
-        self.update_headers()
-        response = RequestAPI.request(self, query=query, url=url, method=method, retry=retry,
-                                      default_break=default_break, **kwargs)
-        self.token_pool.update_GithubTokenState_list(self.token, response)
+        self.cache.match_func = partial(QueryCache.d_match_func, **{"feat_keys": kwargs.get("feat_keys", None) or
+                                                                                 ["url", "method", "query"]})
+        feature_new_rec = {"url": url, "method": method, "query": query}
+        record_info_cached = self.cache.find_record_in_cache(feature_new_rec)
+        if record_info_cached:
+            response = dict(record_info_cached).get("response", None)
+        else:
+            self.token = self.token_pool.get_GithubToken()
+            self.update_headers()
+            response = RequestAPI.request(self, query=query, url=url, method=method, retry=retry,
+                                          default_break=default_break, **kwargs)
+            self.token_pool.update_GithubTokenState_list(self.token, response)
+        new_record = dict(**feature_new_rec, **{"response": response})
+        self.cache.add_record(new_record)
         return response
 
 
