@@ -222,8 +222,8 @@ class RequestGitHubAPI(RequestAPI):
             response = RequestAPI.request(self, url=url, method=method, retry=retry, default_break=default_break,
                                           query=query, **kwargs)
             self.token_pool.update_GithubTokenState_list(self.token, response)
-        new_record = dict(**feature_new_rec, **{"response": response})
-        self.cache.add_record(new_record)
+            new_record = dict(**feature_new_rec, **{"response": response})
+            self.cache.add_record(new_record)
         return response
 
 
@@ -264,8 +264,8 @@ class GitHubGraphQLAPI(RequestAPI):
             response = RequestAPI.request(self, query=query, url=url, method=method, retry=retry,
                                           default_break=default_break, **kwargs)
             self.token_pool.update_GithubTokenState_list(self.token, response)
-        new_record = dict(**feature_new_rec, **{"response": response})
-        self.cache.add_record(new_record)
+            new_record = dict(**feature_new_rec, **{"response": response})
+            self.cache.add_record(new_record)
         return response
 
 

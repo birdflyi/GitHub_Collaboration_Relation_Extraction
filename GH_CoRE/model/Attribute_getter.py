@@ -11,6 +11,9 @@ import os
 
 import pandas as pd
 
+from functools import partial
+
+from GH_CoRE.utils.cache import QueryCache
 from GH_CoRE.utils.conndb import ConnDB
 from GH_CoRE.utils.prepare_sql import get_params_condition, format_sql
 from GH_CoRE.utils.request_api import RequestGitHubAPI, GitHubGraphQLAPI
@@ -57,7 +60,19 @@ df_Actor, df_Repo = prepare_loc_actor_repo_table()
 
 
 # 2. query entity attributes from DataBase
+cache_db = QueryCache(max_size=200)
+
+
 def _get_field_from_db(field, where_param, ret='any', dataframe_format=False, **kwargs):
+    cache_db.match_func = partial(QueryCache.d_match_func, **{
+        "feat_keys": ["field", "where_param", "ret", "dataframe_format", "kwargs"]})
+    feature_new_rec = {"field": field, "where_param": where_param, "ret": ret, "dataframe_format": dataframe_format,
+                       "kwargs": kwargs}
+    record_info_cached = cache_db.find_record_in_cache(feature_new_rec)
+    if record_info_cached:
+        result = dict(record_info_cached).get("result", None)
+        return result
+
     if "platform" not in where_param.keys():
         where_param = dict({"platform": 'GitHub'}, **where_param)
     where_param_trimed = {k: v for k, v in where_param.items() if v is not None}
@@ -92,6 +107,8 @@ def _get_field_from_db(field, where_param, ret='any', dataframe_format=False, **
         result = result[df_rs.columns[0]]
         if ret != 'all' and type(result) == list:
             result = result[0]
+    new_record = dict(**feature_new_rec, **{"result": result})
+    cache_db.add_record(new_record)
     return result
 
 

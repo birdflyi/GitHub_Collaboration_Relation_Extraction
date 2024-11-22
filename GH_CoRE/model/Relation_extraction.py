@@ -143,10 +143,10 @@ def get_obj_collaboration_tuples_from_record(record, extract_mode=3, cache=None,
                             for link_text in body_regexed_links:
                                 # Entity Search
                                 feature_new_rec = {"link_pattern_type": link_pattern_type, "link_text": link_text, "rec_repo_id": d_record.get("repo_id")}
-                                new_record_cached = cache.find_record_in_cache(feature_new_rec)
-                                if new_record_cached:
-                                    # print(f"find new record in cache: {new_record_cached}")
-                                    obj_nt_from_body = dict(new_record_cached).get("obj_nt_from_body", ObjEntity(ObjEntity.default_type))
+                                record_info_cached = cache.find_record_in_cache(feature_new_rec)
+                                if record_info_cached:
+                                    # print(f"find new record in cache: {record_info_cached}")
+                                    obj_nt_from_body = dict(record_info_cached).get("obj_nt_from_body", ObjEntity(ObjEntity.default_type))
                                 else:
                                     obj_nt_from_body = get_ent_obj_in_link_text(link_pattern_type, link_text, d_record)
                                     new_record = dict(**feature_new_rec, **{"obj_nt_from_body": obj_nt_from_body})
