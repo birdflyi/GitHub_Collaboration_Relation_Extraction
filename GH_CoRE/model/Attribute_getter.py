@@ -190,7 +190,7 @@ def __get_actor_id_by_actor_login(actor_login):
     requestGitHubAPI = RequestGitHubAPI(url_pat_mode="name")
     url = requestGitHubAPI.get_url("actor", params={"actor_login": actor_login})
     response = requestGitHubAPI.request(url)
-    if response is not None:
+    if response is not None and hasattr(response, "json"):
         data = response.json()
         actor_id = data.get("id", None)
     else:
@@ -203,7 +203,7 @@ def __get_actor_login_by_actor_id(actor_id):
     requestGitHubAPI = RequestGitHubAPI(url_pat_mode="id")
     url = requestGitHubAPI.get_url("actor", params={"actor_id": actor_id})
     response = requestGitHubAPI.request(url)
-    if response is not None:
+    if response is not None and hasattr(response, "json"):
         data = response.json()
         actor_login = data.get("login", None)
     else:
@@ -216,7 +216,7 @@ def __get_repo_id_by_repo_full_name(repo_name):
     requestGitHubAPI = RequestGitHubAPI(url_pat_mode="name")
     url = requestGitHubAPI.get_url("repo", params={"owner": repo_name.split("/")[0], "repo": repo_name.split("/")[-1]})
     response = requestGitHubAPI.request(url)
-    if response is not None:
+    if response is not None and hasattr(response, "json"):
         data = response.json()
         repo_id = data.get("id", None)
     else:
@@ -229,7 +229,7 @@ def __get_repo_full_name_by_repo_id(repo_id):
     requestGitHubAPI = RequestGitHubAPI(url_pat_mode="id")
     url = requestGitHubAPI.get_url("repo", params={"repo_id": repo_id})
     response = requestGitHubAPI.request(url)
-    if response is not None:
+    if response is not None and hasattr(response, "json"):
         data = response.json()
         repo_name = data.get("full_name", None)
     else:
@@ -243,7 +243,7 @@ def __get_github_userinfo_from_email(email):
     requestGitHubAPI = RequestGitHubAPI()
     url = f"https://api.github.com/search/users?q={email}"
     response = requestGitHubAPI.request(url)
-    if response is not None:
+    if response is not None and hasattr(response, "json"):
         data = response.json()
         users = data['items']
         if users:
@@ -258,12 +258,13 @@ def __get_issue_type(repo_id, issue_number):
     url = f"https://api.github.com/repositories/{repo_id}/issues/{issue_number}"
     response = requestGitHubAPI.request(url)
     issue_type = None
-    if response is not None:
+    if response is not None and hasattr(response, "json"):
         issue_data = response.json()
-        if issue_data.get('pull_request', None) is None:
-            issue_type = 'Issue'
-        else:
-            issue_type = 'PullRequest'
+        if issue_data.get('number', None) is not None:
+            if issue_data.get('pull_request', None) is None:
+                issue_type = 'Issue'
+            else:
+                issue_type = 'PullRequest'
     else:
         print("Empty data.")
     return issue_type
@@ -286,7 +287,7 @@ def __get_PR_commits_sha(issue_number, repo_id):
     # print(url)
     response = requestGitHubAPI.request(url)
     commit_sha_list = []
-    if response is not None:
+    if response is not None and hasattr(response, "json"):
         data = response.json()
         commit_sha_list = [commit['sha'] for commit in data]
         # print(commit_sha_list)
@@ -324,7 +325,7 @@ def __get_commit_parents_sha(commit_sha, repo_id=None, repo_full_name=None):
     # print(url)
     response = requestGitHubAPI.request(url)
     parent_sha_list = []
-    if response is not None:
+    if response is not None and hasattr(response, "json"):
         data = response.json()
         parent_sha_list = [commit['sha'] for commit in data['parents']]
         # print(parent_sha_list)
@@ -342,7 +343,7 @@ def __get_tag_commit_sha(_tag_exid, repo_full_name=None):  # 示例：https://ap
         requestGitHubAPI = RequestGitHubAPI(url_pat_mode='id')
         url = requestGitHubAPI.get_url(url_type="repo", params=url_params)
         response = requestGitHubAPI.request(url)
-        if response is not None:
+        if response is not None and hasattr(response, "json"):
             data = response.json()
             repo_full_name = data["full_name"]
         else:
@@ -396,7 +397,7 @@ def __get_tag_commit_sha_by_REST_API(tag_name, owner, repo):
     url = f'https://api.github.com/repos/{owner}/{repo}/tags'
     response = requestGitHubAPI.request(url)
     tag_commit_sha = None
-    if response is not None:
+    if response is not None and hasattr(response, "json"):
         data = response.json()
         # 解析JSON响应
         df_tags = pd.DataFrame(data)

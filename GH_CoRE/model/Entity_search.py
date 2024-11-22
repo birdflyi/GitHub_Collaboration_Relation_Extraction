@@ -115,9 +115,9 @@ def __get_ref_name_exists_flag_by_repo_name(ref_name, repo_name, query_node_type
     variables = df_query[df_query["query_node_types"] == query_node_type]["variables"].values[0]
     query_graphql_api = GitHubGraphQLAPI()
     response = query_graphql_api.request(query, variables=variables)
-    data = response.json()
     get_ref_dict = lambda data: data["data"]["repository"]["ref"]
     try:
+        data = response.json()
         ref_dict = get_ref_dict(data)
         ref_id = ref_dict["target"]["id"]
     except BaseException:
@@ -189,10 +189,10 @@ def __get_ref_names_by_repo_name(repo_name, query_node_type='tag'):
     variables = {} if variables is None else dict(variables)
     query_graphql_api = GitHubGraphQLAPI()
     response = query_graphql_api.request(query, variables=variables)
-    data = response.json()
     get_ref_names = lambda data: [edge["node"]["name"] for edge in data["data"]["repository"]["refs"]["edges"]]
     get_page_info = lambda data: data["data"]["repository"]["refs"]["pageInfo"]
     try:
+        data = response.json()
         name_list = get_ref_names(data)
         page_info = get_page_info(data)
         while page_info["hasNextPage"]:

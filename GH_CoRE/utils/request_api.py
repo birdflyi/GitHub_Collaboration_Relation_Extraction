@@ -93,11 +93,11 @@ class RequestAPI:
                 print(f"Crawling speed is too fast, take a break {default_break} sec.")
                 time.sleep(default_break)
             else:
-                if response.status_code == 200:
-                    return response
-                else:
+                if response.status_code == 200:  # Connected, skip retry
+                    pass
+                else:  # Connected, skip retry
                     print(f"Error fetching {url}: {response.status_code}.")
-                    return None
+                return response
             time.sleep(random.randint(1, 3))
             retry -= 1
         return None
@@ -211,6 +211,11 @@ class RequestGitHubAPI(RequestAPI):
         record_info_cached = self.cache.find_record_in_cache(feature_new_rec)
         if record_info_cached:
             response = dict(record_info_cached).get("response", None)
+            if isinstance(response, requests.Response):
+                if response.status_code != 200:
+                    print(f"Cache report: Error fetching {url}: {response.status_code}.")
+            else:
+                print(f"Cache report: Error fetching {url}, failed to get response!")
         else:
             self.token = self.token_pool.get_GithubToken()
             self.update_headers()
@@ -248,6 +253,11 @@ class GitHubGraphQLAPI(RequestAPI):
         record_info_cached = self.cache.find_record_in_cache(feature_new_rec)
         if record_info_cached:
             response = dict(record_info_cached).get("response", None)
+            if isinstance(response, requests.Response):
+                if response.status_code != 200:
+                    print(f"Cache report: Error fetching {url}: {response.status_code}.")
+            else:
+                print(f"Cache report: Error fetching {url}, failed to get response!")
         else:
             self.token = self.token_pool.get_GithubToken()
             self.update_headers()
