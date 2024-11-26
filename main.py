@@ -182,7 +182,7 @@ if __name__ == '__main__':
     relation_extraction_save_dir = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR],
                                                 "GitHub_Collaboration_Network_repos")
     collaboration_relation_extraction(repo_keys, df_dbms_repos_dict, relation_extraction_save_dir, update_exists=True,
-                                      add_mode_if_exists=True, use_relation_type_list=["EventAction", "Reference"])
+                                      add_mode_if_exists=True, use_relation_type_list=["EventAction", "Reference"], last_stop_index=-1)
 
     # # Just for test
     # import pandas as pd

@@ -841,6 +841,7 @@ if __name__ == '__main__':
     # link_text = '\n'.join([e_i for e in d_link_text.values() for e_i in e]) + temp_link_text
     # print(re.findall(re_ref_patterns["Issue_PR"][0], link_text))
     link_text = """
+    https://user-images.githubusercontent.com/5196885/210510377-b4122452-b6e3-458d-9238-c8ef3050300d.png
     adityamaru@gmail.com
     https://github.com/cockroachdb/cockroach/pull/107417#ref-commit-f147c2b
     http://127.0.0.1:7001]

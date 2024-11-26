@@ -49,4 +49,4 @@ __all__.extend(model.__all__)
 __all__.extend(working_flow.__all__)
 __all__.extend(utils.__all__)
 
-__version__ = "2.1.1"
+__version__ = "2.1.2"

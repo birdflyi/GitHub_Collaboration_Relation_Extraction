@@ -306,7 +306,7 @@ re_ref_patterns = {
     'GitHub_Files_FileChanges': [r'https?://(?:www\.|redirect\.)?github(?:-redirect\.dependabot)?\.com/[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*/files[-_A-Za-z0-9\.%#/:]*(?![-_A-Za-z0-9\.%#/:])', r'https?://(?:www\.|redirect\.)?github(?:-redirect\.dependabot)?\.com/[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*/pull/\d+/files(?!#r)(?!/[0-9a-fA-F]{40}#r)[-_A-Za-z0-9\.%#/:]*(?![-_A-Za-z0-9\.%#/:])', r'https?://(?:www\.|redirect\.)?github(?:-redirect\.dependabot)?\.com/[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*/blob/[-_A-Za-z0-9\.%#/:]*(?![-_A-Za-z0-9\.%#/:])'],
     'GitHub_Other_Links': [r'(https?://(?:www\.|redirect\.)?github(?:-redirect\.dependabot)?\.com/[A-Za-z0-9][-0-9a-zA-Z]*(?:\[bot\])?/[A-Za-z0-9][-_0-9a-zA-Z\.]*/(?!issues|pull|commit|tree|wiki|releases|files|blob)[-_A-Za-z0-9\.%#/:]*(?![-_A-Za-z0-9\.%#/:]))'],
     'GitHub_Other_Service': [r'(https?://(?!www\.)(?!redirect\.)[-a-zA-Z]+\.github(?:-redirect\.dependabot|usercontent)?\.com[-_A-Za-z0-9\.%#/:]*(?:\[bot\])?)(?![-_A-Za-z0-9\.%#/:])', '(https?://(?!www\.)?github(?:-redirect\.dependabot)?\.com/apps/[-_A-Za-z0-9\.%#/:]*(?:\[bot\])?)(?![-_A-Za-z0-9\.%#/:])'],
-    'GitHub_Service_External_Links': [r'(https?://(?![-a-zA-Z]+\.github\.com|github\.com|github-redirect\.dependabot\.com)[-_A-Za-z0-9\.%#/:]*(?![-_A-Za-z0-9\.%#/:]))']
+    'GitHub_Service_External_Links': [r'(https?://(?![-a-zA-Z]+\.github\.com|github\.com|github-redirect\.dependabot\.com|[-a-zA-Z]+\.githubusercontent\.com)[-_A-Za-z0-9\.%#/:]*(?![-_A-Za-z0-9\.%#/:]))']
 }
 
 
