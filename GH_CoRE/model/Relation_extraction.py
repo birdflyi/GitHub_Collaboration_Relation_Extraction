@@ -210,11 +210,11 @@ def save_GitHub_Collaboration_Network(df_collaboration, save_path, add_mode_if_e
             os.makedirs(dir_path)
     if add_mode_if_exists:
         if not os.path.exists(save_path):
-            df_collaboration.to_csv(save_path, mode='w', header=True, index=False)
+            df_collaboration.to_csv(save_path, mode='w', header=True, index=False, encoding='utf-8', lineterminator='\n')
         else:
-            df_collaboration.to_csv(save_path, mode='a', header=False, index=False)  # 追加模式
+            df_collaboration.to_csv(save_path, mode='a', header=False, index=False, encoding='utf-8', lineterminator='\n')  # 追加模式
     else:
-        df_collaboration.to_csv(save_path, mode='w', header=True, index=False)
+        df_collaboration.to_csv(save_path, mode='w', header=True, index=False, encoding='utf-8', lineterminator='\n')
     return None
 
 

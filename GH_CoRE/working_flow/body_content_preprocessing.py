@@ -94,7 +94,7 @@ if __name__ == '__main__':
     for repo_key, df_dbms_repo in df_dbms_repos_raw_dict.items():
         save_path = os.path.join(dbms_repos_dedup_content_dir, "{repo_key}.csv".format(**{"repo_key": repo_key}))
         if DEDUP_CONTENT_OVERWRITE or not os.path.exists(save_path):
-            dedup_content(df_dbms_repo).to_csv(save_path)
+            dedup_content(df_dbms_repo).to_csv(save_path, header=True, index=True, encoding='utf-8', lineterminator='\n')
     if not DEDUP_CONTENT_OVERWRITE:
         print('skip exist dedup_content...')
     print('dedup_content done!')

@@ -35,7 +35,7 @@ def prepare_loc_actor_repo_table():
             conndb.sql = """SELECT DISTINCT(actor_id) AS actor_id, anyHeavy(actor_login) AS actor_login FROM opensource.events WHERE platform='GitHub' GROUP BY actor_id ORDER BY actor_id;"""
             try:
                 conndb.execute()
-                conndb.rs.to_csv(path_Actor, encoding='utf-8')
+                conndb.rs.to_csv(path_Actor, header=True, index=True, encoding='utf-8', lineterminator='\n')
             except BaseException as e:
                 print(f"{path_Actor} is not updated due to an unexpected error: {e.__class__.__name__}!")
             df_Actor = pd.DataFrame() if conndb.rs is None else conndb.rs
@@ -47,7 +47,7 @@ def prepare_loc_actor_repo_table():
             conndb.sql = """SELECT repo_id, repo_name FROM opensource.events WHERE platform='GitHub' AND created_at BETWEEN '2023-01-01 00:00:00' AND '2024-01-01 00:00:00' GROUP BY repo_id, repo_name;"""
             try:
                 conndb.execute()
-                conndb.rs.to_csv(path_Repo, encoding='utf-8')
+                conndb.rs.to_csv(path_Repo, header=True, index=True, encoding='utf-8', lineterminator='\n')
             except BaseException as e:
                 print(f"{path_Repo} is not updated due to an unexpected error: {e.__class__.__name__}!")
             df_Repo = pd.DataFrame() if conndb.rs is None else conndb.rs

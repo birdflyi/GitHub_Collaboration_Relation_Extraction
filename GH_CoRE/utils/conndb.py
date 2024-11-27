@@ -221,6 +221,6 @@ if __name__ == '__main__':
     conndb.sql = f"SELECT * FROM system.columns WHERE database='{use_database}' AND table='{use_table}';"
     df_data_description = conndb.execute(show_time_cost=True)
     data_description_path = os.path.join(pkg_rootdir, 'data/global_data/data_description.csv')
-    df_data_description.to_csv(data_description_path, index=False, encoding='utf-8')
+    df_data_description.to_csv(data_description_path, header=True, index=False, encoding='utf-8', lineterminator='\n')
     print("columns: ", conndb.columns)
     print("df_data_description is saved!")

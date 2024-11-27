@@ -53,7 +53,7 @@ def query_repo_log_each_year_to_csv_dir(repo_names, columns, save_dir, sql_param
                 conndb.sql = sql_ref_repo
                 try:
                     conndb.execute()
-                    conndb.rs.to_csv(save_path)
+                    conndb.rs.to_csv(save_path, header=True, index=True, encoding='utf-8', lineterminator='\n')
                 except BaseException as e:
                     print(f"{filename} is skipped due to an unexpected error: {e.__class__.__name__}!")
                     return
