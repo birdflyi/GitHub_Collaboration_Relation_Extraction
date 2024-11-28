@@ -263,7 +263,7 @@ def __get_github_userinfo_from_email(email):
     if response is not None and hasattr(response, "json"):
         data = response.json()
         users = data.get('items', None)
-        if isinstance(users, list):
+        if isinstance(users, list) and len(users):
             usersinfo = users[0]
     else:
         print("Empty data.")
