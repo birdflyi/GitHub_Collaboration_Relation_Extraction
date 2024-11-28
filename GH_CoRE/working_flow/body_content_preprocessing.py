@@ -21,11 +21,18 @@ def read_csvs(csv_dir, ignore_empty=True, header='infer', index_col=None, filena
         file_name, suffix = os.path.splitext(full_file_name)
         if suffix == '.csv':
             kwargs["low_memory"] = kwargs.get("low_memory", False)
-            df = pd.read_csv(os.path.join(csv_dir, full_file_name), header=header, index_col=index_col, **kwargs)
-            if ignore_empty and not len(df):
-                print(file_name, 'is empty! It will be ignored.')
+            try:
+                df = pd.read_csv(os.path.join(csv_dir, full_file_name), header=header, index_col=index_col, **kwargs)
+            except FileNotFoundError as e:
+                if ignore_empty:
+                    print(e, 'It will be ignored.')
+                else:
+                    raise FileNotFoundError(e)
             else:
-                df_dict[file_name] = df
+                if ignore_empty and not len(df):
+                    print(file_name, 'is empty! It will be ignored.')
+                else:
+                    df_dict[file_name] = df
     return df_dict
 
 
