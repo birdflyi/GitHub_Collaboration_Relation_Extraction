@@ -151,7 +151,8 @@ if __name__ == '__main__':
 
     # Download sample data
     year = 2023
-    repo_names = ["apache/lucene-solr", "TuGraph-family/tugraph-db", "facebook/rocksdb", "cockroachdb/cockroach"][1:2]
+    # repo_names = ["apache/lucene-solr", "TuGraph-family/tugraph-db", "facebook/rocksdb", "cockroachdb/cockroach"][1:2]
+    repo_names = ["apache/kylin"]
 
     dbms_repos_raw_content_dir = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR], 'repos')
     if repo_names:
@@ -162,7 +163,9 @@ if __name__ == '__main__':
         query_repo_log_each_year_to_csv_dir(repo_names, columns=columns_simple, save_dir=dbms_repos_raw_content_dir,
                                             sql_param=sql_param)
     else:
-        query_OSDB_github_log_from_dbserver(key_feats_path=dbms_repos_raw_content_dir, save_dir=dbms_repos_raw_content_dir)
+        dbms_repos_key_feats_path = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR],
+                                                 'dbfeatfusion_records_202410_automerged_manulabeled_with_repoid.csv')
+        query_OSDB_github_log_from_dbserver(key_feats_path=dbms_repos_key_feats_path, save_dir=dbms_repos_raw_content_dir)
 
     filenames_exists = os.listdir(dbms_repos_raw_content_dir)
     if repo_names:
@@ -181,7 +184,7 @@ if __name__ == '__main__':
     # Collaboration Relation extraction
     relation_extraction_save_dir = os.path.join(filePathConf.absPathDict[filePathConf.GITHUB_OSDB_DATA_DIR],
                                                 "GitHub_Collaboration_Network_repos")
-    collaboration_relation_extraction(repo_keys, df_dbms_repos_dict, relation_extraction_save_dir, update_exists=True,
+    collaboration_relation_extraction(repo_keys, df_dbms_repos_dict, relation_extraction_save_dir, update_exists=False,
                                       add_mode_if_exists=True, use_relation_type_list=["EventAction", "Reference"], last_stop_index=-1)
 
     # # Just for test

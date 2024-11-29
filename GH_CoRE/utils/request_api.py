@@ -114,10 +114,16 @@ class GitHubTokenPool:
             except:
                 self.github_tokens = GITHUB_TOKENS
         self.tokenState_list = self.init_tokenState_list()
-        self.minTime_tokenState = {"token": '', "remaining": 0, "reset": float(time.time())}
+        self.minTime_tokenState = self.__class__.init_empty_tokenState()
+        self.ip_limit_resource = ['search']
+
+    @staticmethod
+    def init_empty_tokenState(reset=None):
+        reset = reset if reset is not None else float(time.time())
+        return {"token": "", "remaining": 0, "reset": reset, "resource": None}
 
     def init_tokenState_list(self):
-        return [{"token": token, "remaining": 1, "reset": float(time.time())} for token in self.github_tokens]
+        return [{"token": token, "remaining": 1, "reset": float(time.time()), "resource": None} for token in self.github_tokens]
 
     def get_GithubToken(self):
         if not self.tokenState_list:
@@ -127,9 +133,9 @@ class GitHubTokenPool:
             if tokenState['remaining'] > 0:
                 return tokenState['token']
 
-        self.minTime_tokenState = None
+        self.minTime_tokenState = self.__class__.init_empty_tokenState()
         for tokenState in self.tokenState_list:
-            if self.minTime_tokenState is None or self.minTime_tokenState['reset'] > tokenState['reset']:
+            if not self.minTime_tokenState["token"] or self.minTime_tokenState['reset'] > tokenState['reset']:
                 self.minTime_tokenState = tokenState
 
         sleep_time = int(self.minTime_tokenState['reset'] - time.time())
@@ -140,7 +146,7 @@ class GitHubTokenPool:
         return self.minTime_tokenState['token']
 
     def update_GithubTokenState_list(self, token, response):
-        if not response:
+        if response is None:  # bool(response[401]) = False if use `not response`!
             return None
         for i, tokenState in enumerate(self.tokenState_list):
             if token == tokenState['token']:
@@ -154,7 +160,23 @@ class GitHubTokenPool:
                 elif 'Retry-After' in response.headers:
                     tokenState['reset'] = int(time.time()) + int(response.headers['Retry-After']) + 1
 
+                # For authenticated requests, you can make up to 30 requests per minute for all search endpoints
+                # except for the "Search code" endpoint.
+                #   see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#rate-limit
+                #   Notes: search limit rate on ip!
+                if 'X-Ratelimit-Resource' in response.headers:
+                    tokenState['resource'] = response.headers['X-Ratelimit-Resource']
+
+                if tokenState['remaining'] == 0 and tokenState['resource'] in self.ip_limit_resource:
+                    sleep_time = int(tokenState['reset'] - time.time())
+                    if sleep_time > 0:
+                        print(f'Sleep {str(sleep_time)} sec for ip limit rate.')
+                        time.sleep(sleep_time)
                 self.tokenState_list[i] = tokenState
+        return None
+
+    def remove_GithubToken(self, token):
+        self.tokenState_list = [tokenState for tokenState in self.tokenState_list if tokenState['token'] != token]
         return None
 
 
@@ -221,6 +243,15 @@ class RequestGitHubAPI(RequestAPI):
             self.update_headers()
             response = RequestAPI.request(self, url=url, method=method, retry=retry, default_break=default_break,
                                           query=query, **kwargs)
+            while 'bad credentials' in str(response.content).lower():
+                print(f'Retry {response.url} after removing bad credentials.')
+                self.token_pool.remove_GithubToken(self.token)
+                if not len(self.token_pool.tokenState_list):
+                    raise ValueError("No available tokens!")
+                self.token = self.token_pool.get_GithubToken()
+                self.update_headers()
+                response = RequestAPI.request(self, url=url, method=method, retry=retry, default_break=default_break,
+                                              query=query, **kwargs)
             self.token_pool.update_GithubTokenState_list(self.token, response)
             new_record = dict(**feature_new_rec, **{"response": response})
             self.cache.add_record(new_record)
@@ -263,6 +294,15 @@ class GitHubGraphQLAPI(RequestAPI):
             self.update_headers()
             response = RequestAPI.request(self, query=query, url=url, method=method, retry=retry,
                                           default_break=default_break, **kwargs)
+            while 'bad credentials' in str(response.content).lower():
+                print(f'Retry {response.url} after removing bad credentials.')
+                self.token_pool.remove_GithubToken(self.token)
+                if not len(self.token_pool.tokenState_list):
+                    raise ValueError("No available tokens!")
+                self.token = self.token_pool.get_GithubToken()
+                self.update_headers()
+                response = RequestAPI.request(self, query=query, url=url, method=method, retry=retry,
+                                              default_break=default_break, **kwargs)
             self.token_pool.update_GithubTokenState_list(self.token, response)
             new_record = dict(**feature_new_rec, **{"response": response})
             self.cache.add_record(new_record)
