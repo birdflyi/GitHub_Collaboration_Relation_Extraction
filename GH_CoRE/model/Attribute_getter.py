@@ -437,6 +437,7 @@ if __name__ == '__main__':
         __get_actor_login_by_actor_id(49427213),
         __get_repo_id_by_repo_full_name("X-lab2017/open-digger"),
         __get_repo_full_name_by_repo_id(288431943),
+        _get_field_from_db('actor_id', {'actor_login': 'or'}),
         _get_field_from_db('push_commits.message', {'type': 'PushEvent', 'repo_id': None, 'push_head': 'eced203d53133650123dc944f758c5f8240b45cb'}),
         _get_field_from_db('actor_id', {'type': 'PushEvent', 'push_head': 'eced203d53133650123dc944f758c5f8240b45cb'}),
         _get_field_from_db('body', {'type': 'CommitCommentEvent', 'commit_comment_id': 93389283}),

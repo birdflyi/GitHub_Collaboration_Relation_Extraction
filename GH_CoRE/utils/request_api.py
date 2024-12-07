@@ -283,11 +283,14 @@ class RequestGitHubAPI(RequestAPI):
             self.update_headers()
             response = RequestAPI.request(self, url=url, method=method, retry=retry, default_break=default_break,
                                           query=query, **kwargs)
-            while 'bad credentials' in str(response.content).lower():
-                print(f'Retry {response.url} after removing bad credentials.')
-                self.token_pool.remove_GithubToken(self.token)
-                # if not len(self.token_pool.tokenState_list) >= 2:
-                #     self.token_pool.init_tokenState_list(inplace=True)
+            while 'bad credentials' in str(response.content).lower() or response.status_code == 403:
+                if 'bad credentials' in str(response.content).lower():
+                    print(f'Retry {response.url} after removing bad credentials.')
+                    self.token_pool.remove_GithubToken(self.token)
+                    # if not len(self.token_pool.tokenState_list) >= 2:
+                    #     self.token_pool.init_tokenState_list(inplace=True)
+                else:
+                    print(f'Retry {response.url} use another token.')
                 self.token = self.token_pool.get_GithubToken()
                 self.update_headers()
                 response = RequestAPI.request(self, url=url, method=method, retry=retry, default_break=default_break,
@@ -334,11 +337,14 @@ class GitHubGraphQLAPI(RequestAPI):
             self.update_headers()
             response = RequestAPI.request(self, query=query, url=url, method=method, retry=retry,
                                           default_break=default_break, **kwargs)
-            while 'bad credentials' in str(response.content).lower():
-                print(f'Retry {response.url} after removing bad credentials.')
-                self.token_pool.remove_GithubToken(self.token)
-                # if not len(self.token_pool.tokenState_list) >= 2:
-                #     self.token_pool.init_tokenState_list(inplace=True)
+            while 'bad credentials' in str(response.content).lower() or response.status_code == 403:
+                if 'bad credentials' in str(response.content).lower():
+                    print(f'Retry {response.url} after removing bad credentials.')
+                    self.token_pool.remove_GithubToken(self.token)
+                    # if not len(self.token_pool.tokenState_list) >= 2:
+                    #     self.token_pool.init_tokenState_list(inplace=True)
+                else:
+                    print(f'Retry {response.url} use another token.')
                 self.token = self.token_pool.get_GithubToken()
                 self.update_headers()
                 response = RequestAPI.request(self, query=query, url=url, method=method, retry=retry,

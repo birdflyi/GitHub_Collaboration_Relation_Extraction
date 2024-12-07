@@ -17,9 +17,11 @@ def get_params_condition(d_params=None, lstrip_and_connector=True):
         for k, v in d_params.items():
             v_upper_masked = re.sub(r'\'[^\']*\'', 'MASK', str(v).upper())
             v_upper_words = v_upper_masked.split()
-            if any([op in v_upper_words for op in operators]):
-                v_upper_masked_stripped = v_upper_masked.lstrip()
-                kv_connector = '' if any([v_upper_masked_stripped.startswith(op) for op in operators[:3]]) else ' '
+            v_upper_masked_stripped = v_upper_masked.lstrip()
+            is_comp_op = any([v_upper_masked_stripped.startswith(op) for op in operators[:3]])
+            not_only_op_char = len(v_upper_masked_stripped.strip('>=<')) > 0 if is_comp_op else len(v_upper_words) > 1
+            if any([op in v_upper_words for op in operators]) and not_only_op_char:
+                kv_connector = '' if is_comp_op else ' '
                 cond_repr = f"{and_connector}{k}{kv_connector}{v}"
             else:
                 cond_repr = f"{and_connector}{k}='{v}'"

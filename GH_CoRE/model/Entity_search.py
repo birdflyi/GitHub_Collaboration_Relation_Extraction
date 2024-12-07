@@ -122,7 +122,7 @@ def __get_ref_name_exists_flag_by_repo_name(ref_name, repo_name, query_node_type
         ref_id = ref_dict["target"]["id"]
     except BaseException:
         ref_id = None
-    ref_name_exists_flag = ref_id is not None
+    ref_name_exists_flag = ref_id is not None and ref_id != ''
     return ref_name_exists_flag
 
 
@@ -235,6 +235,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
             repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                 "repo_name") else d_record.get("repo_id")
             issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
+            issue_number = int(issue_number)
             pull_merge_commit_sha = get_first_match_or_none(r'[0-9a-fA-F]{40}(?=#r)', link_text)
             pull_review_comment_id = get_first_match_or_none(r'(?<=(?<=#discussion_r)|(?<=#r))\d+', link_text)
             objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "issue_number": issue_number, 'pull_review_comment_id': pull_review_comment_id}
@@ -249,6 +250,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
             repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                 "repo_name") else d_record.get("repo_id")
             issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
+            issue_number = int(issue_number)
             pull_review_id = get_first_match_or_none(r'(?<=#pullrequestreview-)\d+', link_text)
             objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "issue_number": issue_number, 'pull_review_id': pull_review_id}
             d_val.update(objnt_prop_dict)
@@ -260,6 +262,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
             repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                 "repo_name") else d_record.get("repo_id")
             issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
+            issue_number = int(issue_number)
             issue_comment_id = get_first_match_or_none(r'(?<=#issuecomment-)\d+', link_text)
             objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "issue_number": issue_number, 'issue_comment_id': issue_comment_id}
             d_val.update(objnt_prop_dict)
@@ -271,6 +274,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
             repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                 "repo_name") else d_record.get("repo_id")
             issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
+            issue_number = int(issue_number)
             commit_sha = get_first_match_or_none(r'(?<=#ref-commit-)[0-9a-fA-F]{7,40}', link_text)
             temp_objnt_prop_dict = {}
             if commit_sha:
@@ -294,6 +298,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
             repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                 "repo_name") else d_record.get("repo_id")
             issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
+            issue_number = int(issue_number)
             issue_elemName_elemIds = get_first_match_or_none(r'(?<=#)[-_0-9a-zA-Z\.%#/:]+-\d+', link_text)
             objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "issue_number": issue_number}
             if issue_elemName_elemIds:
@@ -313,6 +318,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
             repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                 "repo_name") else d_record.get("repo_id")
             issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
+            issue_number = int(issue_number)
             issue_elemName_elemIds = get_first_match_or_none(r'(?<=#)[-_0-9a-zA-Z\.%#/:]+-\d+', link_text)
             objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name, "issue_number": issue_number}
             if issue_elemName_elemIds:
@@ -337,6 +343,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
                     repo_name = repo_name or d_record.get("repo_name")
                     repo_id = repo_id or d_record.get("repo_id") or get_repo_id_by_repo_full_name(repo_name)
                 issue_number = get_first_match_or_none(r'(?<=#)0*[1-9][0-9]*', link_text)
+                issue_number = int(issue_number)
             elif re.findall(r"(?i)^(?:Issues?)(?:#)0*[1-9][0-9]*$", link_text):  # e.g. issue#32
                 nt = "Issue"
                 if d_record.get("repo_id"):
@@ -346,8 +353,10 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
                     repo_name = repo_name or d_record.get("repo_name")
                     repo_id = repo_id or d_record.get("repo_id") or get_repo_id_by_repo_full_name(repo_name)
                 issue_number = get_first_match_or_none(r'(?<=#)0*[1-9][0-9]*', link_text)
+                issue_number = int(issue_number)
             elif re.findall(r"^(?:#)0*[1-9][0-9]*$", link_text):  # e.g. #782, '#734', '#3221'
                 issue_number = get_first_match_or_none(r'(?<=#)0*[1-9][0-9]*', link_text)
+                issue_number = int(issue_number)  # regard '#01' as issue_number=1
                 if d_record.get("repo_id"):
                     repo_id = d_record.get("repo_id")  # 传入record的repo_id字段
                     repo_name = d_record.get("repo_name") or get_repo_name_by_repo_id(repo_id)
@@ -361,6 +370,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
                 repo_id = get_repo_id_by_repo_full_name(repo_name) if repo_name != d_record.get(
                     "repo_name") else d_record.get("repo_id")
                 issue_number = get_first_match_or_none(r'(?<=#)0*[1-9][0-9]*', link_text)
+                issue_number = int(issue_number)
                 nt = get_issue_type_by_repo_id_issue_number(repo_id, issue_number) or default_node_type  # uncertain
             else:
                 nt = default_node_type  # obj e.g. 'RB#26080', 'BUG#32134875', 'BUG#31553323'
@@ -390,6 +400,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
                 "repo_name") else d_record.get("repo_id")
             objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name}
             issue_number = get_first_match_or_none(r'(?<=(?<=issues/)|(?<=pull/))\d+', link_text)
+            issue_number = int(issue_number)
             if issue_number is not None:
                 objnt_prop_dict.update({"issue_number": issue_number})
             else:
@@ -604,6 +615,9 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
             if Branch_Tag_GHDir_name:
                 Branch_Tag_GHDir_name = str(Branch_Tag_GHDir_name)
                 Branch_Tag_GHDir_name_url_dec = unquote(Branch_Tag_GHDir_name)
+                if Branch_Tag_GHDir_name.endswith("'") or Branch_Tag_GHDir_name.endswith("\""):
+                    Branch_Tag_GHDir_name = Branch_Tag_GHDir_name[:-1]
+                    Branch_Tag_GHDir_name_url_dec = unquote(Branch_Tag_GHDir_name)
                 branch_ref_name_exists = __get_ref_name_exists_flag_by_repo_name(Branch_Tag_GHDir_name, repo_name, query_node_type="branch")
                 branch_ref_name_dec_exists = __get_ref_name_exists_flag_by_repo_name(Branch_Tag_GHDir_name_url_dec, repo_name, query_node_type="branch")
                 if branch_ref_name_exists or branch_ref_name_dec_exists:
@@ -672,6 +686,9 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
                 "repo_name") else d_record.get("repo_id")
             release_tag_name = get_first_match_or_none(r'(?<=/releases/tag/)[^\s]+', link_text)
             release_tag_name_url_dec = unquote(release_tag_name)
+            if str(release_tag_name).endswith("'") or str(release_tag_name).endswith("\""):
+                release_tag_name = release_tag_name[:-1]
+                release_tag_name_url_dec = unquote(release_tag_name)
                
             if release_tag_name == d_record.get("release_tag_name") or release_tag_name_url_dec == d_record.get("release_tag_name"):
                 if release_tag_name_url_dec == d_record.get("release_tag_name"):
@@ -841,6 +858,8 @@ if __name__ == '__main__':
     # link_text = '\n'.join([e_i for e in d_link_text.values() for e_i in e]) + temp_link_text
     # print(re.findall(re_ref_patterns["Issue_PR"][0], link_text))
     link_text = """
+    https://github.com/lancedb/lance/releases/tag/v0.9.1'
+    ```
     https://user-images.githubusercontent.com/5196885/210510377-b4122452-b6e3-458d-9238-c8ef3050300d.png
     adityamaru@gmail.com
     https://github.com/cockroachdb/cockroach/pull/107417#ref-commit-f147c2b
@@ -855,6 +874,7 @@ if __name__ == '__main__':
     cockroachlabs/blathers-bot#92
     Friendly ping on this one as well @andrewbaptis.
     Friendly ping on this one as well @andrewbaptis.(edited)
+    ```
     """
 
     from GH_CoRE.working_flow import mask_code
