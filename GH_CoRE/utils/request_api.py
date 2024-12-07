@@ -122,8 +122,41 @@ class GitHubTokenPool:
         reset = reset if reset is not None else float(time.time())
         return {"token": "", "remaining": 0, "reset": reset, "resource": None}
 
-    def init_tokenState_list(self):
-        return [{"token": token, "remaining": 1, "reset": float(time.time()), "resource": None} for token in self.github_tokens]
+    def init_tokenState_list(self, inplace=False, retry_after_reset=True, retry_wait_sec=3600):
+        tokenState_list = [{"token": token, "remaining": 1, "reset": float(time.time()), "resource": None}
+                           for token in self.github_tokens if self.validate_github_token(token)]
+        init_flag = len(tokenState_list) > 0
+        if not init_flag:
+            if retry_after_reset:
+                print(f"INFO: None available token right now! The token state list will retry another initialization "
+                      f"after {retry_wait_sec} sec.")
+                time.sleep(retry_wait_sec)
+                tokenState_list = [{"token": token, "remaining": 1, "reset": float(time.time()), "resource": None}
+                                   for token in self.github_tokens if self.validate_github_token(token)]
+                init_flag = len(tokenState_list) > 0
+        if not init_flag:
+            raise ValueError("None available token! Please update the GITHUB_TOKENS config!")
+        if inplace:
+            self.tokenState_list = tokenState_list
+        return tokenState_list
+
+    def validate_github_token(self, github_token, expect_valid_after=0):
+        response = requests.get('https://api.github.com/user', headers={'Authorization': f'token {github_token}'})
+        if response.status_code == 200 or 'Authorization' in response.headers.get("Vary", ""):
+            valid = True
+            # username = response.json()['login']
+        elif response.status_code in [403, 429]:
+            # https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#exceeding-the-rate-limit
+            try:
+                expect_reset_time = int(time.time()) + int(expect_valid_after) + 1
+                limit_reset_time = int(response.headers['X-RateLimit-Reset'])
+                valid_expect = limit_reset_time < expect_reset_time
+                valid = valid_expect
+            except KeyError:
+                valid = False
+        else:
+            valid = False
+        return valid
 
     def get_GithubToken(self):
         if not self.tokenState_list:
@@ -246,8 +279,8 @@ class RequestGitHubAPI(RequestAPI):
             while 'bad credentials' in str(response.content).lower():
                 print(f'Retry {response.url} after removing bad credentials.')
                 self.token_pool.remove_GithubToken(self.token)
-                if not len(self.token_pool.tokenState_list):
-                    raise ValueError("No available tokens!")
+                # if not len(self.token_pool.tokenState_list) >= 2:
+                #     self.token_pool.init_tokenState_list(inplace=True)
                 self.token = self.token_pool.get_GithubToken()
                 self.update_headers()
                 response = RequestAPI.request(self, url=url, method=method, retry=retry, default_break=default_break,
@@ -297,8 +330,8 @@ class GitHubGraphQLAPI(RequestAPI):
             while 'bad credentials' in str(response.content).lower():
                 print(f'Retry {response.url} after removing bad credentials.')
                 self.token_pool.remove_GithubToken(self.token)
-                if not len(self.token_pool.tokenState_list):
-                    raise ValueError("No available tokens!")
+                # if not len(self.token_pool.tokenState_list) >= 2:
+                #     self.token_pool.init_tokenState_list(inplace=True)
                 self.token = self.token_pool.get_GithubToken()
                 self.update_headers()
                 response = RequestAPI.request(self, query=query, url=url, method=method, retry=retry,
