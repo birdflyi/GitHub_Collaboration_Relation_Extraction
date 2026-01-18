@@ -304,7 +304,7 @@ re_ref_patterns = {
     'Gollum': ['https?://(?:www\.|redirect\.)?github(?:-redirect\.dependabot)?\.com/[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*/wiki/[-_A-Za-z0-9\.%#/:]*(?![-_A-Za-z0-9\.%#/:])'],
     'Release': ['https?://(?:www\.|redirect\.)?github(?:-redirect\.dependabot)?\.com/[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*/releases/tag/[^\:\[\?\s\*\\\\,;\]`)]*(?!>[\:\[\?\s\*,#\|\+@\<\>≤≥\=≠\&$\{\}\]\";`])'],
     'GitHub_Files_FileChanges': [r'https?://(?:www\.|redirect\.)?github(?:-redirect\.dependabot)?\.com/[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*/files[-_A-Za-z0-9\.%#/:]*(?![-_A-Za-z0-9\.%#/:])', r'https?://(?:www\.|redirect\.)?github(?:-redirect\.dependabot)?\.com/[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*/pull/\d+/files(?!#r)(?!/[0-9a-fA-F]{40}#r)[-_A-Za-z0-9\.%#/:]*(?![-_A-Za-z0-9\.%#/:])', r'https?://(?:www\.|redirect\.)?github(?:-redirect\.dependabot)?\.com/[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*/blob/[-_A-Za-z0-9\.%#/:]*(?![-_A-Za-z0-9\.%#/:])'],
-    'GitHub_Other_Links': [r'(https?://(?:www\.|redirect\.)?github(?:-redirect\.dependabot)?\.com/[A-Za-z0-9][-0-9a-zA-Z]*(?:\[bot\])?/[A-Za-z0-9][-_0-9a-zA-Z\.]*/(?!issues|pull|commit|tree|wiki|releases|files|blob)[-_A-Za-z0-9\.%#/:]*(?![-_A-Za-z0-9\.%#/:]))'],
+    'GitHub_GenSer_Other_Links': [r'(https?://(?:www\.|redirect\.)?github(?:-redirect\.dependabot)?\.com/[A-Za-z0-9][-0-9a-zA-Z]*(?:\[bot\])?/[A-Za-z0-9][-_0-9a-zA-Z\.]*/(?!issues|pull|commit|tree|wiki|releases|files|blob)[-_A-Za-z0-9\.%#/:]*(?![-_A-Za-z0-9\.%#/:]))'],
     'GitHub_Other_Service': [r'(https?://(?!www\.)(?!redirect\.)[-a-zA-Z]+\.github(?:-redirect\.dependabot|usercontent)?\.com[-_A-Za-z0-9\.%#/:]*(?:\[bot\])?)(?![-_A-Za-z0-9\.%#/:])', '(https?://(?!www\.)?github(?:-redirect\.dependabot)?\.com/apps/[-_A-Za-z0-9\.%#/:]*(?:\[bot\])?)(?![-_A-Za-z0-9\.%#/:])'],
     'GitHub_Service_External_Links': [r'(https?://(?![-a-zA-Z]+\.github\.com|github\.com|github-redirect\.dependabot\.com|[-a-zA-Z]+\.githubusercontent\.com)[-_A-Za-z0-9\.%#/:]*(?![-_A-Za-z0-9\.%#/:]))']
 }
@@ -346,7 +346,7 @@ e.g. "	id	type	action	actor_id	actor_login	repo_id	repo_name	repo_description	or
 - 每个msg_body字段、每个pattern识别出的引用子串数
 - 每个msg_body字段存在引用的频数及真值（任一pattern识别出子串即为真）
 
-### 4. regex_patterns: 'Issue_PR', 'SHA', 'actor', 'repo', 'github_src', 'github_other_links', 'outer_http'
+### 4. regex_patterns: 'Issue_PR', 'SHA', 'Actor', 'Repo', 'Branch_Tag_GHDir', 'CommitComment', 'Gollum', 'Release', 'GitHub_Files_FileChanges', 'GitHub_GenSer_Other_Links', 'GitHub_Other_Service', 'GitHub_Service_External_Links'
 
 e.g. Issue_PR 0 s1_subs: ['https://github.com/X-lab2017/open-research/issues/123#issue-1406887967'], SHA 0 s2_subs: ['https://github.com/X-lab2017/open-galaxy/pull/2/commits/7f9f3706abc7b5a9ad37470519f5066119ba46c2'], actor 0 s3_subs: ['https://github.com/birdflyi'], repo 0 s4_subs: ['https://github.com/X-lab2017/open-research'], ...
 

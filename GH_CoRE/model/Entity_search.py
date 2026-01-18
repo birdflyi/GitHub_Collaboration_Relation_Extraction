@@ -29,7 +29,7 @@ d_link_pattern_type_nt = {
     "Gollum": ["Gollum", default_node_type],
     "Release": ["Release", default_node_type],
     "GitHub_Files_FileChanges": [default_node_type],  # 可以与owner, repo_name关联
-    "GitHub_Other_Links": [default_node_type],  # 可以与owner, repo_name关联
+    "GitHub_GenSer_Other_Links": [default_node_type],  # 可以与owner, repo_name关联
     "GitHub_Other_Service": [default_node_type],  # 可以与owner关联，并确定service根网址属性
     "GitHub_Service_External_Links": [default_node_type],
 }
@@ -728,7 +728,7 @@ def get_ent_obj_in_link_text(link_pattern_type, link_text, d_record, default_nod
             "repo_id")
         objnt_prop_dict = {"repo_id": repo_id, "repo_name": repo_name}
         d_val.update(objnt_prop_dict)
-    elif link_pattern_type == "GitHub_Other_Links":
+    elif link_pattern_type == "GitHub_GenSer_Other_Links":
         nt = default_node_type
         org_repo_name = get_first_match_or_none(r'(?<=com/)[A-Za-z0-9][-0-9a-zA-Z]*/[A-Za-z0-9][-_0-9a-zA-Z\.]*', link_text)
         org_repo_name = str(org_repo_name)
@@ -848,7 +848,7 @@ if __name__ == '__main__':
         "GitHub_Files_FileChanges_2 strs_all subs": [
             'https://github.com/facebook/rocksdb/blob/main/HISTORY.md#840-06262023',
             'https://github.com/birdflyi/Research-Methods-of-Cross-Science/blob/main/%E4%BB%8E%E7%A7%91%E5%AD%A6%E8%B5%B7%E6%BA%90%E7%9C%8B%E4%BA%A4%E5%8F%89%E5%AD%A6%E7%A7%91.md'],
-        "GitHub_Other_Links_0 strs_all subs": ['https://github.com/X-lab2017/open-digger/labels/pull%2Fhypertrons'],
+        "GitHub_GenSer_Other_Links_0 strs_all subs": ['https://github.com/X-lab2017/open-digger/labels/pull%2Fhypertrons'],
         "GitHub_Other_Service_0 strs_all subs": ['https://gist.github.com/birdflyi'],
         "GitHub_Other_Service_1 strs_all subs": ['https://github.com/apps/dependabot'],
         "GitHub_Service_External_Links_0 strs_all subs": ['http://sqlite.org/forum/forumpost/fdb0bb7ad0',
