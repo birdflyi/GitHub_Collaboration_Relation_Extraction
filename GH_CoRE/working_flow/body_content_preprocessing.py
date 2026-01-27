@@ -16,7 +16,7 @@ def read_csvs(csv_dir, ignore_empty=True, header='infer', index_col=None, filena
     # read csvs in csv_dir.
     # e.g. If 'filename1.csv', 'filename2.csv' in csv_dir, return {'filename1': df1, 'filename2': df2}
     df_dict = {}
-    filenames = filenames or os.listdir(csv_dir)
+    filenames = filenames if filenames is not None else os.listdir(csv_dir)
     for full_file_name in filenames:
         file_name, suffix = os.path.splitext(full_file_name)
         if suffix == '.csv':
